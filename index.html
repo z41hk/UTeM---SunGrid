@@ -6,13 +6,13 @@
 <title>UTeM SunGrid – Peta Kampus</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 <style>
-html,body{height:100%;margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+html,body{height:100%;margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:#e9edf3}
 #map{position:fixed;inset:0}
 .chip{position:fixed;background:rgba(255,255,255,.92);color:#12261c;border-radius:14px;box-shadow:0 2px 10px rgba(0,0,0,.2);z-index:2}
 #title{top:calc(env(safe-area-inset-top,0px) + 12px);left:12px;padding:8px 14px}
 #title b{display:block;font-size:15px;color:#1f6f4a}
 #title span{font-size:12px;opacity:.75}
-#sat{right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 82px);width:46px;height:46px;border:0;font-weight:700;font-size:12px;color:#1f6f4a;cursor:pointer}
+#theme{right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 82px);width:46px;height:46px;border:0;font-weight:700;font-size:18px;color:#1f6f4a;cursor:pointer}
 #tilt{right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 28px);width:46px;height:46px;border:0;font-weight:700;font-size:14px;color:#1f6f4a;cursor:pointer}
 </style>
 </head>
@@ -20,65 +20,158 @@ html,body{height:100%;margin:0;font-family:-apple-system,BlinkMacSystemFont,"Seg
 <div id="map"></div>
 <div class="chip" id="title"><b>UTeM SunGrid</b><span>Peta Kampus UTeM</span></div>
 <button class="chip" id="tilt">3D</button>
-<button class="chip" id="sat">SAT</button>
+<button class="chip" id="theme" aria-label="Siang atau malam">☀</button>
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
-// Satellite tiles come from MapTiler via /api/tile; the key stays on the server.
+var palettes = {
+  day: {
+    bg:"#e9edf3", campus:"#e2e7ef", grass:"#cdeac3", woods:"#a8d49a",
+    water:"#8ec9f0", waterOutline:"#6fb2e0",
+    roadCasing:"#cfd5e1", roadFill:"#ffffff", roadPrimary:"#ffd25a",
+    roadPrimaryCasing:"#e0b23c", roadService:"#e8ebf1",
+    buildingLow:"#fff6e6", buildingMid:"#e4dcff", buildingHigh:"#cfe0ff",
+    roofLow:"#fffdf8", roofMid:"#f3eeff", roofHigh:"#e8f1ff",
+    text:"#2c3a4a", textHalo:"#ffffff"
+  },
+  night: {
+    bg:"#0f1722", campus:"#1a2433", grass:"#1d3a2b", woods:"#15291f",
+    water:"#17324d", waterOutline:"#245a78",
+    roadCasing:"#1b2433", roadFill:"#2c3a4f", roadPrimary:"#c9a227",
+    roadPrimaryCasing:"#8a7018", roadService:"#243044",
+    buildingLow:"#3b4a66", buildingMid:"#4c5e82", buildingHigh:"#5a6f99",
+    roofLow:"#5c6e8c", roofMid:"#6b7fa3", roofHigh:"#7d91b5",
+    text:"#ffffff", textHalo:"rgba(0,0,0,.75)"
+  }
+};
+
+var bldgH = ["max", ["coalesce", ["get", "render_height"], 9], 9];
+var bldgB = ["coalesce", ["get", "render_min_height"], 0];
+var roadFilter = ["in", "class", "motorway", "trunk", "primary", "secondary", "tertiary", "minor", "service", "path"];
+var fillWidth = ["interpolate", ["exponential", 1.5], ["zoom"],
+  13, ["match", ["get", "class"], ["motorway", "trunk", "primary"], 2.2, "secondary", 1.6, ["tertiary", "minor"], 1.1, 0.6],
+  17, ["match", ["get", "class"], ["motorway", "trunk", "primary"], 7.5, "secondary", 5.5, ["tertiary", "minor"], 3.6, "service", 2.2, 1.2],
+  20, ["match", ["get", "class"], ["motorway", "trunk", "primary"], 22, "secondary", 16, ["tertiary", "minor"], 11, "service", 6, 3]];
+var caseWidth = ["interpolate", ["exponential", 1.5], ["zoom"],
+  13, ["match", ["get", "class"], ["motorway", "trunk", "primary"], 3.4, "secondary", 2.6, ["tertiary", "minor"], 2, 1.2],
+  17, ["match", ["get", "class"], ["motorway", "trunk", "primary"], 10, "secondary", 7.5, ["tertiary", "minor"], 5.2, "service", 3.4, 2],
+  20, ["match", ["get", "class"], ["motorway", "trunk", "primary"], 28, "secondary", 20, ["tertiary", "minor"], 14, "service", 8, 4.5]];
+
+function roadColor(p, kind) {
+  if (kind === "casing") return ["match", ["get", "class"], ["motorway", "trunk", "primary"], p.roadPrimaryCasing, p.roadCasing];
+  return ["match", ["get", "class"], ["motorway", "trunk", "primary"], p.roadPrimary, ["service", "path"], p.roadService, p.roadFill];
+}
+function bldgColor(p, roof) {
+  return ["interpolate", ["linear"], bldgH, 0, roof ? p.roofLow : p.buildingLow, 12, roof ? p.roofMid : p.buildingMid, 30, roof ? p.roofHigh : p.buildingHigh];
+}
+
+function makeLayers(p) {
+  return [
+    { id:"bg", type:"background", paint:{ "background-color": p.bg } },
+    { id:"land-campus", type:"fill", source:"omt", "source-layer":"landuse",
+      filter:["in","class","residential","school","university","college","commercial","industrial","retail","hospital","stadium"],
+      paint:{ "fill-color": p.campus } },
+    { id:"land-grass", type:"fill", source:"omt", "source-layer":"landcover",
+      filter:["in","class","grass","farmland"],
+      paint:{ "fill-color": p.grass } },
+    { id:"land-pitch", type:"fill", source:"omt", "source-layer":"landuse",
+      filter:["in","class","pitch","playground","track","park"],
+      paint:{ "fill-color": p.grass } },
+    { id:"park", type:"fill", source:"omt", "source-layer":"park",
+      paint:{ "fill-color": p.grass } },
+    { id:"land-woods", type:"fill", source:"omt", "source-layer":"landcover",
+      filter:["==","class","wood"],
+      paint:{ "fill-color": p.woods } },
+    { id:"water", type:"fill", source:"omt", "source-layer":"water",
+      paint:{ "fill-color": p.water } },
+    { id:"water-outline", type:"line", source:"omt", "source-layer":"water",
+      paint:{ "line-color": p.waterOutline, "line-width": 1 } },
+    { id:"waterway", type:"line", source:"omt", "source-layer":"waterway",
+      paint:{ "line-color": p.waterOutline, "line-width": 1.2 } },
+    { id:"road-casing", type:"line", source:"omt", "source-layer":"transportation",
+      filter: roadFilter,
+      layout:{ "line-cap":"round", "line-join":"round" },
+      paint:{ "line-color": roadColor(p, "casing"), "line-width": caseWidth } },
+    { id:"road-fill", type:"line", source:"omt", "source-layer":"transportation",
+      filter: roadFilter,
+      layout:{ "line-cap":"round", "line-join":"round" },
+      paint:{ "line-color": roadColor(p, "fill"), "line-width": fillWidth } },
+    { id:"building-3d", type:"fill-extrusion", source:"omt", "source-layer":"building", minzoom:14,
+      paint:{
+        "fill-extrusion-color": bldgColor(p, false),
+        "fill-extrusion-height": bldgH,
+        "fill-extrusion-base": bldgB,
+        "fill-extrusion-opacity": 1,
+        "fill-extrusion-vertical-gradient": true } },
+    { id:"building-roof", type:"fill-extrusion", source:"omt", "source-layer":"building", minzoom:14,
+      paint:{
+        "fill-extrusion-color": bldgColor(p, true),
+        "fill-extrusion-height": ["+", bldgH, 0.5],
+        "fill-extrusion-base": bldgH,
+        "fill-extrusion-opacity": 1,
+        "fill-extrusion-vertical-gradient": false } },
+    { id:"road-name", type:"symbol", source:"omt", "source-layer":"transportation_name", minzoom:16,
+      layout:{ "symbol-placement":"line", "text-field":["coalesce",["get","name:ms"],["get","name"]], "text-font":["Noto Sans Regular"], "text-size":11 },
+      paint:{ "text-color": p.text, "text-halo-color": p.textHalo, "text-halo-width": 1.5 } },
+    { id:"place", type:"symbol", source:"omt", "source-layer":"poi", minzoom:16,
+      filter:["in","class","college","university","school","library","place_of_worship","hospital","stadium","town_hall"],
+      layout:{ "text-field":["coalesce",["get","name:ms"],["get","name"]], "text-font":["Noto Sans Regular"], "text-size":12, "text-offset":[0,.6], "text-anchor":"top" },
+      paint:{ "text-color": p.text, "text-halo-color": p.textHalo, "text-halo-width": 1.5 } }
+  ];
+}
+
+function applyPalette(p) {
+  map.setPaintProperty("bg", "background-color", p.bg);
+  map.setPaintProperty("land-campus", "fill-color", p.campus);
+  map.setPaintProperty("land-grass", "fill-color", p.grass);
+  map.setPaintProperty("land-pitch", "fill-color", p.grass);
+  map.setPaintProperty("park", "fill-color", p.grass);
+  map.setPaintProperty("land-woods", "fill-color", p.woods);
+  map.setPaintProperty("water", "fill-color", p.water);
+  map.setPaintProperty("water-outline", "line-color", p.waterOutline);
+  map.setPaintProperty("waterway", "line-color", p.waterOutline);
+  map.setPaintProperty("road-casing", "line-color", roadColor(p, "casing"));
+  map.setPaintProperty("road-fill", "line-color", roadColor(p, "fill"));
+  map.setPaintProperty("building-3d", "fill-extrusion-color", bldgColor(p, false));
+  map.setPaintProperty("building-roof", "fill-extrusion-color", bldgColor(p, true));
+  map.setPaintProperty("road-name", "text-color", p.text);
+  map.setPaintProperty("road-name", "text-halo-color", p.textHalo);
+  map.setPaintProperty("place", "text-color", p.text);
+  map.setPaintProperty("place", "text-halo-color", p.textHalo);
+}
+
+var night = false;
 var style = {
   version: 8,
   glyphs: "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
   sources: {
-    omt: { type: "vector", url: "https://tiles.openfreemap.org/planet" },
-    sat: { type: "raster", tileSize: 512, maxzoom: 20,
-      tiles: [location.origin + "/api/tile?z={z}&x={x}&y={y}"],
-      attribution: "© MapTiler" }
+    omt: { type: "vector", url: "https://tiles.openfreemap.org/planet" }
   },
-  layers: [
-    { id:"bg", type:"background", paint:{ "background-color":"#1c2b25" } },
-    { id:"sat", type:"raster", source:"sat",
-      paint:{ "raster-saturation":0.05, "raster-contrast":0.1 } },
-    { id:"road", type:"line", source:"omt", "source-layer":"transportation",
-      filter:["in","class","motorway","trunk","primary","secondary","tertiary","minor","service"],
-      layout:{ "line-cap":"round","line-join":"round" },
-      paint:{ "line-color":["match",["get","class"],["motorway","trunk","primary"],"#ffd25a","#ffffff"],
-        "line-opacity":0.55,
-        "line-width":["interpolate",["exponential",1.5],["zoom"],13,.5,17,["match",["get","class"],["motorway","trunk","primary","secondary"],6,["tertiary","minor"],3.5,1.5],20,["match",["get","class"],["motorway","trunk","primary","secondary"],28,["tertiary","minor"],16,6]] } },
-    { id:"building-3d", type:"fill-extrusion", source:"omt", "source-layer":"building", minzoom:14,
-      paint:{
-        "fill-extrusion-color":["interpolate",["linear"],["coalesce",["get","render_height"],8],0,"#fffdf7",40,"#e9dcff"],
-        "fill-extrusion-height":["coalesce",["get","render_height"],8],
-        "fill-extrusion-base":["coalesce",["get","render_min_height"],0],
-        "fill-extrusion-opacity":0.45 } },
-    { id:"road-name", type:"symbol", source:"omt", "source-layer":"transportation_name", minzoom:16,
-      layout:{ "symbol-placement":"line","text-field":["coalesce",["get","name:ms"],["get","name"]],"text-font":["Noto Sans Regular"],"text-size":11 },
-      paint:{ "text-color":"#ffffff","text-halo-color":"rgba(0,0,0,.65)","text-halo-width":1.5 } },
-    { id:"place", type:"symbol", source:"omt", "source-layer":"poi", minzoom:16,
-      filter:["in","class","school","college","place_of_worship","library"],
-      layout:{ "text-field":["coalesce",["get","name:ms"],["get","name"]],"text-font":["Noto Sans Regular"],"text-size":12,"text-offset":[0,.6],"text-anchor":"top" },
-      paint:{ "text-color":"#ffffff","text-halo-color":"rgba(0,0,0,.7)","text-halo-width":1.5 } }
-  ]
+  layers: makeLayers(palettes.day)
 };
 
 var map = new maplibregl.Map({
   container: "map", style: style,
-  center: [102.3205, 2.3142], zoom: 17, pitch: 55, bearing: -20,
-  maxPitch: 70, minZoom: 14, maxZoom: 21, attributionControl: false
+  center: [102.3205, 2.3142], zoom: 17.3, pitch: 60, bearing: -20,
+  maxPitch: 75, minZoom: 14, maxZoom: 20, attributionControl: false
 });
 map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: "© OpenStreetMap contributors · OpenFreeMap" }), "bottom-left");
 map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
+map.on("load", function () {
+  map.setLight({ anchor: "viewport", color: "#ffffff", intensity: 0.4, position: [1.4, 210, 45] });
+});
 
 var tilted = true, btn = document.getElementById("tilt");
 btn.onclick = function () {
   tilted = !tilted;
-  map.easeTo({ pitch: tilted ? 55 : 0, bearing: tilted ? -20 : 0, duration: 700 });
+  map.easeTo({ pitch: tilted ? 60 : 0, bearing: tilted ? -20 : 0, duration: 700 });
   btn.textContent = tilted ? "3D" : "2D";
 };
-var satOn = true, sb = document.getElementById("sat");
-sb.onclick = function () {
-  satOn = !satOn;
-  map.setLayoutProperty("sat", "visibility", satOn ? "visible" : "none");
-  map.setPaintProperty("bg", "background-color", satOn ? "#1c2b25" : "#eef0f6");
-  sb.textContent = satOn ? "SAT" : "MAP";
+var tb = document.getElementById("theme");
+tb.onclick = function () {
+  night = !night;
+  applyPalette(night ? palettes.night : palettes.day);
+  document.body.style.background = night ? palettes.night.bg : palettes.day.bg;
+  tb.textContent = night ? "🌙" : "☀";
 };
 </script>
 </body>
