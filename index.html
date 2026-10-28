@@ -23,20 +23,21 @@ html,body{height:100%;margin:0;font-family:-apple-system,BlinkMacSystemFont,"Seg
 <button class="chip" id="sat">SAT</button>
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
-// Satellite (Esri World Imagery) + OpenStreetMap roads/3D buildings (OpenFreeMap). No API keys.
+// Satellite tiles come through our own /api/tile endpoint, so the MapTiler key stays on the server.
+// Satellite (MapTiler HD, falls back to Esri) + OpenStreetMap roads/3D buildings (OpenFreeMap). No API keys.
 var style = {
   version: 8,
   glyphs: "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
   sources: {
     omt: { type: "vector", url: "https://tiles.openfreemap.org/planet" },
-    sat: { type: "raster", tileSize: 256, maxzoom: 19,
-      tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
-      attribution: "Imagery © Esri, Maxar, Earthstar Geographics" }
+    sat: { type: "raster", tileSize: 512, maxzoom: 20,
+      tiles: [location.origin + "/api/tile?z={z}&x={x}&y={y}"],
+      attribution: "© MapTiler" }
   },
   layers: [
     { id:"bg", type:"background", paint:{ "background-color":"#1c2b25" } },
     { id:"sat", type:"raster", source:"sat",
-      paint:{ "raster-saturation":-0.15, "raster-contrast":0.05, "raster-brightness-max":0.95 } },
+      paint:{ "raster-saturation":0.05, "raster-contrast":0.1 } },
     { id:"road", type:"line", source:"omt", "source-layer":"transportation",
       filter:["in","class","motorway","trunk","primary","secondary","tertiary","minor","service"],
       layout:{ "line-cap":"round","line-join":"round" },
@@ -48,7 +49,7 @@ var style = {
         "fill-extrusion-color":["interpolate",["linear"],["coalesce",["get","render_height"],8],0,"#fffdf7",40,"#e9dcff"],
         "fill-extrusion-height":["coalesce",["get","render_height"],8],
         "fill-extrusion-base":["coalesce",["get","render_min_height"],0],
-        "fill-extrusion-opacity":0.82 } },
+        "fill-extrusion-opacity":0.45 } },
     { id:"road-name", type:"symbol", source:"omt", "source-layer":"transportation_name", minzoom:16,
       layout:{ "symbol-placement":"line","text-field":["coalesce",["get","name:ms"],["get","name"]],"text-font":["Noto Sans Regular"],"text-size":11 },
       paint:{ "text-color":"#ffffff","text-halo-color":"rgba(0,0,0,.65)","text-halo-width":1.5 } },
@@ -62,7 +63,7 @@ var style = {
 var map = new maplibregl.Map({
   container: "map", style: style,
   center: [102.3205, 2.3142], zoom: 17, pitch: 55, bearing: -20,
-  maxPitch: 70, minZoom: 14, maxZoom: 20, attributionControl: false
+  maxPitch: 70, minZoom: 14, maxZoom: 21, attributionControl: false
 });
 map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: "© OpenStreetMap contributors · OpenFreeMap" }), "bottom-left");
 map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
