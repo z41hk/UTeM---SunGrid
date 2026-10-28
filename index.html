@@ -23,8 +23,7 @@ html,body{height:100%;margin:0;font-family:-apple-system,BlinkMacSystemFont,"Seg
 <button class="chip" id="sat">SAT</button>
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
-// Satellite tiles come through our own /api/tile endpoint, so the MapTiler key stays on the server.
-// Satellite (MapTiler HD, falls back to Esri) + OpenStreetMap roads/3D buildings (OpenFreeMap). No API keys.
+// Satellite tiles come from MapTiler via /api/tile; the key stays on the server.
 var style = {
   version: 8,
   glyphs: "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
