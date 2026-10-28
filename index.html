@@ -12,6 +12,7 @@ html,body{height:100%;margin:0;font-family:-apple-system,BlinkMacSystemFont,"Seg
 #title{top:calc(env(safe-area-inset-top,0px) + 12px);left:12px;padding:8px 14px}
 #title b{display:block;font-size:15px;color:#1f6f4a}
 #title span{font-size:12px;opacity:.75}
+#sat{right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 82px);width:46px;height:46px;border:0;font-weight:700;font-size:12px;color:#1f6f4a;cursor:pointer}
 #tilt{right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 28px);width:46px;height:46px;border:0;font-weight:700;font-size:14px;color:#1f6f4a;cursor:pointer}
 </style>
 </head>
@@ -19,57 +20,49 @@ html,body{height:100%;margin:0;font-family:-apple-system,BlinkMacSystemFont,"Seg
 <div id="map"></div>
 <div class="chip" id="title"><b>UTeM SunGrid</b><span>Peta Kampus UTeM</span></div>
 <button class="chip" id="tilt">3D</button>
+<button class="chip" id="sat">SAT</button>
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
-// Waze-like palette on top of OpenStreetMap data (OpenFreeMap vector tiles, no API key)
-var C = {
-  land:"#eef0f6", park:"#cfe8c8", wood:"#bfe0b8", water:"#a9d4f5",
-  road:"#ffffff", casing:"#c9cfdd", major:"#ffe9a8", majorCase:"#e2c36a",
-  bldg:"#fdfbf6", bldgTop:"#f4ecff", text:"#4a5470"
-};
+// Satellite (Esri World Imagery) + OpenStreetMap roads/3D buildings (OpenFreeMap). No API keys.
 var style = {
   version: 8,
   glyphs: "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
-  sources: { omt: { type: "vector", url: "https://tiles.openfreemap.org/planet" } },
+  sources: {
+    omt: { type: "vector", url: "https://tiles.openfreemap.org/planet" },
+    sat: { type: "raster", tileSize: 256, maxzoom: 19,
+      tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
+      attribution: "Imagery © Esri, Maxar, Earthstar Geographics" }
+  },
   layers: [
-    { id:"bg", type:"background", paint:{ "background-color":C.land } },
-    { id:"landuse", type:"fill", source:"omt", "source-layer":"landuse",
-      filter:["in","class","residential","school","university","campus"],
-      paint:{ "fill-color":"#e6e9f2" } },
-    { id:"park", type:"fill", source:"omt", "source-layer":"park", paint:{ "fill-color":C.park } },
-    { id:"wood", type:"fill", source:"omt", "source-layer":"landcover",
-      filter:["in","class","wood","grass"], paint:{ "fill-color":C.wood, "fill-opacity":.8 } },
-    { id:"water", type:"fill", source:"omt", "source-layer":"water", paint:{ "fill-color":C.water } },
-    { id:"road-casing", type:"line", source:"omt", "source-layer":"transportation",
-      filter:["in","class","motorway","trunk","primary","secondary","tertiary","minor","service"],
-      layout:{ "line-cap":"round","line-join":"round" },
-      paint:{ "line-color":["match",["get","class"],["motorway","trunk","primary"],C.majorCase,C.casing],
-        "line-width":["interpolate",["exponential",1.5],["zoom"],12,1,16,["match",["get","class"],["motorway","trunk","primary","secondary"],9,["tertiary","minor"],6,3],19,["match",["get","class"],["motorway","trunk","primary","secondary"],34,["tertiary","minor"],22,10]] } },
+    { id:"bg", type:"background", paint:{ "background-color":"#1c2b25" } },
+    { id:"sat", type:"raster", source:"sat",
+      paint:{ "raster-saturation":-0.15, "raster-contrast":0.05, "raster-brightness-max":0.95 } },
     { id:"road", type:"line", source:"omt", "source-layer":"transportation",
       filter:["in","class","motorway","trunk","primary","secondary","tertiary","minor","service"],
       layout:{ "line-cap":"round","line-join":"round" },
-      paint:{ "line-color":["match",["get","class"],["motorway","trunk","primary"],C.major,C.road],
-        "line-width":["interpolate",["exponential",1.5],["zoom"],12,.6,16,["match",["get","class"],["motorway","trunk","primary","secondary"],7,["tertiary","minor"],4.5,2],19,["match",["get","class"],["motorway","trunk","primary","secondary"],30,["tertiary","minor"],18,7]] } },
+      paint:{ "line-color":["match",["get","class"],["motorway","trunk","primary"],"#ffd25a","#ffffff"],
+        "line-opacity":0.55,
+        "line-width":["interpolate",["exponential",1.5],["zoom"],13,.5,17,["match",["get","class"],["motorway","trunk","primary","secondary"],6,["tertiary","minor"],3.5,1.5],20,["match",["get","class"],["motorway","trunk","primary","secondary"],28,["tertiary","minor"],16,6]] } },
     { id:"building-3d", type:"fill-extrusion", source:"omt", "source-layer":"building", minzoom:14,
       paint:{
-        "fill-extrusion-color":["interpolate",["linear"],["coalesce",["get","render_height"],6],0,C.bldg,40,C.bldgTop],
-        "fill-extrusion-height":["coalesce",["get","render_height"],6],
+        "fill-extrusion-color":["interpolate",["linear"],["coalesce",["get","render_height"],8],0,"#fffdf7",40,"#e9dcff"],
+        "fill-extrusion-height":["coalesce",["get","render_height"],8],
         "fill-extrusion-base":["coalesce",["get","render_min_height"],0],
-        "fill-extrusion-opacity":.95 } },
-    { id:"road-name", type:"symbol", source:"omt", "source-layer":"transportation_name", minzoom:15,
+        "fill-extrusion-opacity":0.82 } },
+    { id:"road-name", type:"symbol", source:"omt", "source-layer":"transportation_name", minzoom:16,
       layout:{ "symbol-placement":"line","text-field":["coalesce",["get","name:ms"],["get","name"]],"text-font":["Noto Sans Regular"],"text-size":11 },
-      paint:{ "text-color":C.text,"text-halo-color":"#fff","text-halo-width":1.5 } },
+      paint:{ "text-color":"#ffffff","text-halo-color":"rgba(0,0,0,.65)","text-halo-width":1.5 } },
     { id:"place", type:"symbol", source:"omt", "source-layer":"poi", minzoom:16,
       filter:["in","class","school","college","place_of_worship","library"],
       layout:{ "text-field":["coalesce",["get","name:ms"],["get","name"]],"text-font":["Noto Sans Regular"],"text-size":12,"text-offset":[0,.6],"text-anchor":"top" },
-      paint:{ "text-color":C.text,"text-halo-color":"#fff","text-halo-width":1.5 } }
+      paint:{ "text-color":"#ffffff","text-halo-color":"rgba(0,0,0,.7)","text-halo-width":1.5 } }
   ]
 };
 
 var map = new maplibregl.Map({
   container: "map", style: style,
-  center: [102.3205, 2.3142], zoom: 16.2, pitch: 55, bearing: -20,
-  maxPitch: 75, minZoom: 13, attributionControl: false
+  center: [102.3205, 2.3142], zoom: 17, pitch: 55, bearing: -20,
+  maxPitch: 70, minZoom: 14, maxZoom: 20, attributionControl: false
 });
 map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: "© OpenStreetMap contributors · OpenFreeMap" }), "bottom-left");
 map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
@@ -79,6 +72,13 @@ btn.onclick = function () {
   tilted = !tilted;
   map.easeTo({ pitch: tilted ? 55 : 0, bearing: tilted ? -20 : 0, duration: 700 });
   btn.textContent = tilted ? "3D" : "2D";
+};
+var satOn = true, sb = document.getElementById("sat");
+sb.onclick = function () {
+  satOn = !satOn;
+  map.setLayoutProperty("sat", "visibility", satOn ? "visible" : "none");
+  map.setPaintProperty("bg", "background-color", satOn ? "#1c2b25" : "#eef0f6");
+  sb.textContent = satOn ? "SAT" : "MAP";
 };
 </script>
 </body>
