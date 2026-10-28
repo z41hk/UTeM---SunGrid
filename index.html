@@ -14,6 +14,7 @@ html,body{height:100%;margin:0;font-family:-apple-system,BlinkMacSystemFont,"Seg
 #title span{font-size:12px;opacity:.75}
 #theme{right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 82px);width:46px;height:46px;border:0;font-weight:700;font-size:18px;color:#1f6f4a;cursor:pointer}
 #tilt{right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 28px);width:46px;height:46px;border:0;font-weight:700;font-size:14px;color:#1f6f4a;cursor:pointer}
+#debug{left:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 28px);padding:8px 12px;font-size:12px;font-weight:600;max-width:calc(100% - 80px);line-height:1.35}
 </style>
 </head>
 <body>
@@ -31,7 +32,7 @@ var palettes = {
     roadPrimaryCasing:"#e0b23c", roadService:"#e8ebf1",
     buildingLow:"#fff6e6", buildingMid:"#e4dcff", buildingHigh:"#cfe0ff",
     roofLow:"#fffdf8", roofMid:"#f3eeff", roofHigh:"#e8f1ff",
-    text:"#2c3a4a", textHalo:"#ffffff"
+    text:"#2c3a4a", textHalo:"#ffffff", outline:"#1f6f4a"
   },
   night: {
     bg:"#0f1722", campus:"#1a2433", grass:"#1d3a2b", woods:"#15291f",
@@ -40,8 +41,27 @@ var palettes = {
     roadPrimaryCasing:"#8a7018", roadService:"#243044",
     buildingLow:"#3b4a66", buildingMid:"#4c5e82", buildingHigh:"#5a6f99",
     roofLow:"#5c6e8c", roofMid:"#6b7fa3", roofHigh:"#7d91b5",
-    text:"#ffffff", textHalo:"rgba(0,0,0,.75)"
+    text:"#ffffff", textHalo:"rgba(0,0,0,.75)", outline:"#5fd29a"
   }
+};
+
+var CAMPUS_BOUNDS = [[102.3095, 2.3052], [102.3315, 2.3232]];
+var CAMPUS_POLY = [
+  [102.3103, 2.3060],
+  [102.3307, 2.3060],
+  [102.3307, 2.3224],
+  [102.3103, 2.3224],
+  [102.3103, 2.3060]
+];
+var WORLD_RING = [[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]];
+var CAMPUS_HOLE = CAMPUS_POLY.slice().reverse();
+var campusPolyGeo = { type: "Polygon", coordinates: [CAMPUS_POLY] };
+var maskData = {
+  type: "FeatureCollection",
+  features: [
+    { type: "Feature", properties: { kind: "mask" }, geometry: { type: "Polygon", coordinates: [WORLD_RING, CAMPUS_HOLE] } },
+    { type: "Feature", properties: { kind: "outline" }, geometry: { type: "LineString", coordinates: CAMPUS_POLY } }
+  ]
 };
 
 var bldgH = ["max", ["coalesce", ["get", "render_height"], 9], 9];
@@ -109,11 +129,17 @@ function makeLayers(p) {
         "fill-extrusion-base": bldgH,
         "fill-extrusion-opacity": 1,
         "fill-extrusion-vertical-gradient": false } },
+    { id:"mask-fill", type:"fill", source:"mask",
+      filter:["==",["get","kind"],"mask"],
+      paint:{ "fill-color": p.bg, "fill-opacity": 0.9, "fill-antialias": true } },
+    { id:"campus-outline", type:"line", source:"mask",
+      filter:["==",["get","kind"],"outline"],
+      paint:{ "line-color": p.outline, "line-width": 2, "line-opacity": 0.8 } },
     { id:"road-name", type:"symbol", source:"omt", "source-layer":"transportation_name", minzoom:16,
       layout:{ "symbol-placement":"line", "text-field":["coalesce",["get","name:ms"],["get","name"]], "text-font":["Noto Sans Regular"], "text-size":11 },
       paint:{ "text-color": p.text, "text-halo-color": p.textHalo, "text-halo-width": 1.5 } },
     { id:"place", type:"symbol", source:"omt", "source-layer":"poi", minzoom:16,
-      filter:["in","class","college","university","school","library","place_of_worship","hospital","stadium","town_hall"],
+      filter:["all",["in","class","college","university","school","library","place_of_worship","hospital","stadium","town_hall"],["within", campusPolyGeo]],
       layout:{ "text-field":["coalesce",["get","name:ms"],["get","name"]], "text-font":["Noto Sans Regular"], "text-size":12, "text-offset":[0,.6], "text-anchor":"top" },
       paint:{ "text-color": p.text, "text-halo-color": p.textHalo, "text-halo-width": 1.5 } }
   ];
@@ -137,6 +163,8 @@ function applyPalette(p) {
   map.setPaintProperty("road-name", "text-halo-color", p.textHalo);
   map.setPaintProperty("place", "text-color", p.text);
   map.setPaintProperty("place", "text-halo-color", p.textHalo);
+  map.setPaintProperty("mask-fill", "fill-color", p.bg);
+  map.setPaintProperty("campus-outline", "line-color", p.outline);
 }
 
 var night = false;
@@ -144,19 +172,22 @@ var style = {
   version: 8,
   glyphs: "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
   sources: {
-    omt: { type: "vector", url: "https://tiles.openfreemap.org/planet" }
+    omt: { type: "vector", url: "https://tiles.openfreemap.org/planet" },
+    mask: { type: "geojson", data: maskData }
   },
   layers: makeLayers(palettes.day)
 };
 
 var map = new maplibregl.Map({
   container: "map", style: style,
-  center: [102.3205, 2.3142], zoom: 17.3, pitch: 60, bearing: -20,
-  maxPitch: 75, minZoom: 14, maxZoom: 20, attributionControl: false
+  center: [102.3205, 2.3142], zoom: 16.8, pitch: 60, bearing: -20,
+  maxBounds: CAMPUS_BOUNDS, minZoom: 15.3, maxZoom: 20, maxPitch: 75,
+  attributionControl: false
 });
 map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: "© OpenStreetMap contributors · OpenFreeMap" }), "bottom-left");
 map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
 map.on("load", function () {
+  map.setMaxBounds(CAMPUS_BOUNDS);
   map.setLight({ anchor: "viewport", color: "#ffffff", intensity: 0.4, position: [1.4, 210, 45] });
 });
 
@@ -173,6 +204,27 @@ tb.onclick = function () {
   document.body.style.background = night ? palettes.night.bg : palettes.day.bg;
   tb.textContent = night ? "🌙" : "☀";
 };
+
+if (/\bdebug\b/.test(location.search)) {
+  var dbg = document.createElement("div");
+  dbg.id = "debug";
+  dbg.className = "chip";
+  document.body.appendChild(dbg);
+  function fmt(lng, lat) {
+    return Number(lng).toFixed(6) + ", " + Number(lat).toFixed(6);
+  }
+  function showCentre() {
+    var c = map.getCenter();
+    dbg.textContent = "pusat " + fmt(c.lng, c.lat) + " z" + map.getZoom().toFixed(2);
+  }
+  map.on("move", showCentre);
+  map.on("click", function (e) {
+    var t = fmt(e.lngLat.lng, e.lngLat.lat);
+    console.log("tap", [e.lngLat.lng, e.lngLat.lat]);
+    dbg.textContent = "tap " + t;
+  });
+  showCentre();
+}
 </script>
 </body>
 </html>
