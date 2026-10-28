@@ -45,7 +45,8 @@ var palettes = {
   }
 };
 
-var CAMPUS_BOUNDS = [[102.3095, 2.3052], [102.3315, 2.3232]];
+var noLock = /\bnolock\b/.test(location.search);
+var CAMPUS_BOUNDS = [[102.300, 2.296], [102.340, 2.332]];
 var CAMPUS_POLY = [
   [102.3103, 2.3060],
   [102.3307, 2.3060],
@@ -53,15 +54,21 @@ var CAMPUS_POLY = [
   [102.3103, 2.3224],
   [102.3103, 2.3060]
 ];
-var WORLD_RING = [[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]];
+var MASK_OUTER = [
+  [102.250, 2.250],
+  [102.390, 2.250],
+  [102.390, 2.380],
+  [102.250, 2.380],
+  [102.250, 2.250]
+];
 var CAMPUS_HOLE = CAMPUS_POLY.slice().reverse();
-var campusPolyGeo = { type: "Polygon", coordinates: [CAMPUS_POLY] };
 var maskData = {
-  type: "FeatureCollection",
-  features: [
-    { type: "Feature", properties: { kind: "mask" }, geometry: { type: "Polygon", coordinates: [WORLD_RING, CAMPUS_HOLE] } },
-    { type: "Feature", properties: { kind: "outline" }, geometry: { type: "LineString", coordinates: CAMPUS_POLY } }
-  ]
+  type: "Feature",
+  geometry: { type: "Polygon", coordinates: [MASK_OUTER, CAMPUS_HOLE] }
+};
+var outlineData = {
+  type: "Feature",
+  geometry: { type: "LineString", coordinates: CAMPUS_POLY }
 };
 
 var bldgH = ["max", ["coalesce", ["get", "render_height"], 9], 9];
@@ -129,17 +136,11 @@ function makeLayers(p) {
         "fill-extrusion-base": bldgH,
         "fill-extrusion-opacity": 1,
         "fill-extrusion-vertical-gradient": false } },
-    { id:"mask-fill", type:"fill", source:"mask",
-      filter:["==",["get","kind"],"mask"],
-      paint:{ "fill-color": p.bg, "fill-opacity": 0.9, "fill-antialias": true } },
-    { id:"campus-outline", type:"line", source:"mask",
-      filter:["==",["get","kind"],"outline"],
-      paint:{ "line-color": p.outline, "line-width": 2, "line-opacity": 0.8 } },
     { id:"road-name", type:"symbol", source:"omt", "source-layer":"transportation_name", minzoom:16,
       layout:{ "symbol-placement":"line", "text-field":["coalesce",["get","name:ms"],["get","name"]], "text-font":["Noto Sans Regular"], "text-size":11 },
       paint:{ "text-color": p.text, "text-halo-color": p.textHalo, "text-halo-width": 1.5 } },
     { id:"place", type:"symbol", source:"omt", "source-layer":"poi", minzoom:16,
-      filter:["all",["in","class","college","university","school","library","place_of_worship","hospital","stadium","town_hall"],["within", campusPolyGeo]],
+      filter:["in","class","college","university","school","library","place_of_worship","hospital","stadium","town_hall"],
       layout:{ "text-field":["coalesce",["get","name:ms"],["get","name"]], "text-font":["Noto Sans Regular"], "text-size":12, "text-offset":[0,.6], "text-anchor":"top" },
       paint:{ "text-color": p.text, "text-halo-color": p.textHalo, "text-halo-width": 1.5 } }
   ];
@@ -163,8 +164,8 @@ function applyPalette(p) {
   map.setPaintProperty("road-name", "text-halo-color", p.textHalo);
   map.setPaintProperty("place", "text-color", p.text);
   map.setPaintProperty("place", "text-halo-color", p.textHalo);
-  map.setPaintProperty("mask-fill", "fill-color", p.bg);
-  map.setPaintProperty("campus-outline", "line-color", p.outline);
+  if (map.getLayer("mask-fill")) map.setPaintProperty("mask-fill", "fill-color", p.bg);
+  if (map.getLayer("campus-outline")) map.setPaintProperty("campus-outline", "line-color", p.outline);
 }
 
 var night = false;
@@ -172,23 +173,40 @@ var style = {
   version: 8,
   glyphs: "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
   sources: {
-    omt: { type: "vector", url: "https://tiles.openfreemap.org/planet" },
-    mask: { type: "geojson", data: maskData }
+    omt: { type: "vector", url: "https://tiles.openfreemap.org/planet" }
   },
   layers: makeLayers(palettes.day)
 };
 
-var map = new maplibregl.Map({
+var mapOpts = {
   container: "map", style: style,
   center: [102.3205, 2.3142], zoom: 16.8, pitch: 60, bearing: -20,
-  maxBounds: CAMPUS_BOUNDS, minZoom: 15.3, maxZoom: 20, maxPitch: 75,
+  minZoom: noLock ? 14 : 14.8, maxZoom: 20, maxPitch: 75,
   attributionControl: false
-});
+};
+if (!noLock) mapOpts.maxBounds = CAMPUS_BOUNDS;
+var map = new maplibregl.Map(mapOpts);
 map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: "© OpenStreetMap contributors · OpenFreeMap" }), "bottom-left");
 map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
 map.on("load", function () {
-  map.setMaxBounds(CAMPUS_BOUNDS);
   map.setLight({ anchor: "viewport", color: "#ffffff", intensity: 0.4, position: [1.4, 210, 45] });
+  if (noLock) return;
+  try {
+    map.setMaxBounds(CAMPUS_BOUNDS);
+    map.addSource("mask", { type: "geojson", data: maskData });
+    map.addSource("campus-line", { type: "geojson", data: outlineData });
+    var p = night ? palettes.night : palettes.day;
+    map.addLayer({
+      id: "mask-fill", type: "fill", source: "mask",
+      paint: { "fill-color": p.bg, "fill-opacity": 0.85, "fill-antialias": true }
+    }, "road-name");
+    map.addLayer({
+      id: "campus-outline", type: "line", source: "campus-line",
+      paint: { "line-color": p.outline, "line-width": 2, "line-opacity": 0.8 }
+    }, "road-name");
+  } catch (e) {
+    console.warn("campus lock skipped", e);
+  }
 });
 
 var tilted = true, btn = document.getElementById("tilt");
