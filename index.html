@@ -74,6 +74,7 @@ var palettes = {
 
 var noLock = /\bnolock\b/.test(location.search);
 var CLICKABLE_FACULTY_ONLY = true;
+var CLOSE_FLY_MS = 2600;
 var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 var CAMPUS_BOUNDS = [[102.310337, 2.298282], [102.331156, 2.323705]];
 var CAMPUS_POLY = [
@@ -344,32 +345,55 @@ function trapFocus(e) {
   if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
   else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
 }
+function fadeSelected() {
+  if (!map.getLayer("selected-bldg")) { clearSelected(); return; }
+  map.setPaintProperty("selected-bldg", "fill-extrusion-opacity-transition", { duration: 400 });
+  map.setPaintProperty("selected-bldg", "fill-extrusion-opacity", 0);
+  setTimeout(function () {
+    clearSelected();
+    if (map.getLayer("selected-bldg")) map.setPaintProperty("selected-bldg", "fill-extrusion-opacity", 0.95);
+  }, 420);
+}
 function recentreCampus() {
-  tilted = false;
-  btn.textContent = "3D";
-  var opts = { padding: { top: 70, bottom: 70, left: 70, right: 70 }, pitch: 0, bearing: 0, essential: true };
+  var pad = { top: 70, bottom: 70, left: 70, right: 70 };
+  var target = map.cameraForBounds(CAMPUS_BOUNDS, { padding: pad, bearing: 0, pitch: 0 });
+  var minZ = map.getMinZoom();
+  var zoom = Math.max(target.zoom, minZ);
+  var center = target.center;
   if (reduceMotion) {
-    map.fitBounds(CAMPUS_BOUNDS, Object.assign(opts, { duration: 0 }));
+    map.jumpTo({ center: center, zoom: zoom, pitch: 0, bearing: 0 });
+    tilted = false;
+    btn.textContent = "3D";
     return;
   }
   fitting = true;
-  map.fitBounds(CAMPUS_BOUNDS, Object.assign(opts, { duration: 1600, easing: easeInOutCubic }));
+  map.flyTo({
+    center: center,
+    zoom: zoom,
+    pitch: 0,
+    bearing: 0,
+    duration: CLOSE_FLY_MS,
+    curve: 1.5,
+    easing: easeInOutCubic,
+    essential: true
+  });
 }
 function closePopup() {
   if (!popupOpen) return;
   popupOpen = false;
-  clearSelected();
+  fadeSelected();
   backdrop.classList.add("closing");
   backdrop.classList.remove("open");
   card.setAttribute("aria-hidden", "true");
   document.removeEventListener("keydown", trapFocus);
+  map.stop();
+  recentreCampus();
   clearTimeout(popupTimer);
   popupTimer = setTimeout(function () {
     backdrop.classList.remove("show", "closing");
     if (lastFocus && lastFocus.focus) lastFocus.focus();
     else map.getCanvas().focus();
-    recentreCampus();
-  }, reduceMotion ? 200 : 200);
+  }, 200);
 }
 function openPopup(b, feat, lngLat) {
   lastFocus = document.activeElement;
@@ -504,9 +528,17 @@ card.onclick = function (e) { e.stopPropagation(); };
 backdrop.onclick = function () { closePopup(); };
 document.addEventListener("keydown", function (e) { if (e.key === "Escape") closePopup(); });
 ["mousedown", "touchstart", "wheel", "dragstart"].forEach(function (ev) {
-  map.on(ev, function () { if (fitting) { fitting = false; map.stop(); } });
+  map.on(ev, function (e) {
+    if (fitting && e.originalEvent) { fitting = false; map.stop(); }
+  });
 });
-map.on("moveend", function () { fitting = false; });
+map.on("moveend", function () {
+  if (fitting) {
+    fitting = false;
+    tilted = false;
+    btn.textContent = "3D";
+  }
+});
 
 var tilted = true, btn = document.getElementById("tilt");
 btn.onclick = function () {
