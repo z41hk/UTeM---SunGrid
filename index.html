@@ -32,12 +32,12 @@ html,body{height:100%;margin:0;font-family:-apple-system,BlinkMacSystemFont,"Seg
 .bcard .pic{min-height:220px;height:100%;border-radius:16px;background:#d7dde8;display:flex;align-items:center;justify-content:center;font-size:15px;opacity:.8}
 .carousel{display:flex;flex-direction:column;min-width:0}
 .carousel-frame{position:relative;aspect-ratio:4/3;background:#d7dde8;border-radius:14px;overflow:hidden}
-.carousel-track{display:flex;height:100%;transition:transform .3s ease}
+.carousel-track{display:flex;height:100%;transition:transform .3s ease;touch-action:pan-y;pointer-events:auto}
 .carousel-slide{flex:0 0 100%;height:100%;display:flex;align-items:center;justify-content:center;position:relative}
 .carousel-slide img{max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;cursor:zoom-in}
 .carousel-skel{position:absolute;inset:0;background:linear-gradient(90deg,#d7dde8 0%,#eceff4 50%,#d7dde8 100%);background-size:200% 100%;animation:skel 1.2s linear infinite}
 .carousel-err{font-size:14px;opacity:.75;padding:16px;text-align:center}
-.carousel-nav{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:44px;border:0;border-radius:50%;background:rgba(255,255,255,.9);color:#12261c;font-size:22px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.18);z-index:1}
+.carousel-nav{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:44px;border:0;border-radius:50%;background:rgba(255,255,255,.9);color:#12261c;font-size:22px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.18);z-index:5;pointer-events:auto;touch-action:manipulation}
 .carousel-prev{left:8px}
 .carousel-next{right:8px}
 .carousel-badge{position:absolute;top:10px;left:10px;background:#1f6f4a;color:#fff;font-size:11px;letter-spacing:.04em;text-transform:uppercase;padding:4px 8px;border-radius:8px;z-index:1}
@@ -45,7 +45,7 @@ html,body{height:100%;margin:0;font-family:-apple-system,BlinkMacSystemFont,"Seg
 .carousel-count{font-size:13px;opacity:.7;min-width:3.2em}
 .carousel-cap{flex:1;font-size:14px}
 .carousel-dots{display:flex;gap:6px;flex-wrap:wrap}
-.carousel-dot{width:10px;height:10px;padding:0;border:0;border-radius:50%;background:#c5ccd6;cursor:pointer}
+.carousel-dot{width:10px;height:10px;padding:0;border:0;border-radius:50%;background:#c5ccd6;cursor:pointer;pointer-events:auto;touch-action:manipulation;min-width:44px;min-height:44px;background-clip:content-box;padding:17px}
 .carousel-dot.on{background:#1f6f4a}
 .lightbox{position:fixed;inset:0;z-index:6;display:none;align-items:center;justify-content:center;background:rgba(6,12,9,.86);padding:16px}
 .lightbox.show{display:flex}
@@ -371,10 +371,10 @@ function renderCarousel(b) {
     h += "</div>";
   }
   h += "</div>";
-  h += "<button type=\"button\" class=\"carousel-nav carousel-prev\" aria-label=\"Gambar sebelumnya\">‹</button>";
-  h += "<button type=\"button\" class=\"carousel-nav carousel-next\" aria-label=\"Gambar seterusnya\">›</button>";
+  h += "<button type=\"button\" class=\"carousel-nav carousel-prev\" data-prev aria-label=\"Gambar sebelumnya\">‹</button>";
+  h += "<button type=\"button\" class=\"carousel-nav carousel-next\" data-next aria-label=\"Gambar seterusnya\">›</button>";
   h += "</div><div class=\"carousel-meta\"><span class=\"carousel-count\"></span><p class=\"carousel-cap\"></p><div class=\"carousel-dots\">";
-  for (var d = 0; d < imgs.length; d++) h += "<button type=\"button\" class=\"carousel-dot\" aria-label=\"Gambar " + (d + 1) + "\"></button>";
+  for (var d = 0; d < imgs.length; d++) h += "<button type=\"button\" class=\"carousel-dot\" data-dot=\"" + d + "\" aria-label=\"Gambar " + (d + 1) + "\"></button>";
   h += "</div></div></div>";
   return h;
 }
@@ -409,7 +409,7 @@ function preloadSlide(i) {
   var img = new Image();
   img.src = carousel.building.images[i].src;
 }
-function showSlide(i) {
+function goTo(i) {
   try {
     var n = carousel.slides.length;
     if (!n) return;
@@ -452,15 +452,21 @@ function bindCarousel(b) {
     carousel.slides = Array.prototype.slice.call(card.querySelectorAll(".carousel-slide"));
     carousel.i = 0;
     if (!carousel.slides.length) return;
+    var root = card.querySelector(".carousel");
     var frame = card.querySelector(".carousel-frame");
-    var prev = card.querySelector(".carousel-prev");
-    var next = card.querySelector(".carousel-next");
-    var dots = card.querySelectorAll(".carousel-dot");
-    if (prev) prev.onclick = function (e) { e.stopPropagation(); showSlide(carousel.i - 1); };
-    if (next) next.onclick = function (e) { e.stopPropagation(); showSlide(carousel.i + 1); };
-    for (var d = 0; d < dots.length; d++) (function (idx) {
-      dots[idx].onclick = function (e) { e.stopPropagation(); showSlide(idx); };
-    })(d);
+    if (root) {
+      root.onclick = function (e) {
+        var prev = e.target.closest("[data-prev]");
+        var next = e.target.closest("[data-next]");
+        var dot = e.target.closest("[data-dot]");
+        var img = e.target.closest(".carousel-slide img");
+        if (prev || next || dot || img) e.stopPropagation();
+        if (prev) { e.preventDefault(); goTo(carousel.i - 1); return; }
+        if (next) { e.preventDefault(); goTo(carousel.i + 1); return; }
+        if (dot) { e.preventDefault(); goTo(Number(dot.getAttribute("data-dot"))); return; }
+        if (img) openLightbox();
+      };
+    }
     carousel.slides.forEach(function (slide) {
       var img = slide.querySelector("img");
       var skel = slide.querySelector(".carousel-skel");
@@ -474,24 +480,31 @@ function bindCarousel(b) {
         err.textContent = "Gambar tidak dapat dimuatkan";
         slide.appendChild(err);
       };
-      img.onclick = function (e) { e.stopPropagation(); openLightbox(); };
       if (img.complete && img.naturalWidth) img.onload();
     });
-    var startX = 0, startY = 0, swiping = false;
+    var startX = 0, startY = 0, tracking = false, captured = false;
     if (frame) {
       frame.onpointerdown = function (e) {
+        if (e.target.closest("button")) return;
         if (e.pointerType === "mouse" && e.button !== 0) return;
-        startX = e.clientX; startY = e.clientY; swiping = true;
+        startX = e.clientX; startY = e.clientY; tracking = true; captured = false;
+      };
+      frame.onpointermove = function (e) {
+        if (!tracking || captured) return;
+        if (Math.abs(e.clientX - startX) < 8) return;
+        captured = true;
         try { frame.setPointerCapture(e.pointerId); } catch (err) {}
       };
       frame.onpointerup = function (e) {
-        if (!swiping) return;
-        swiping = false;
+        if (!tracking) return;
+        tracking = false;
         var dx = e.clientX - startX, dy = e.clientY - startY;
-        if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) showSlide(carousel.i + (dx < 0 ? 1 : -1));
+        if (captured && Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) goTo(carousel.i + (dx < 0 ? 1 : -1));
+        captured = false;
       };
+      frame.onpointercancel = function () { tracking = false; captured = false; };
     }
-    showSlide(0);
+    goTo(0);
   } catch (e) {
     console.warn("carousel skipped", e);
   }
@@ -715,12 +728,12 @@ document.addEventListener("keydown", function (e) {
     return;
   }
   if (!popupOpen || !carousel.slides.length) return;
-  if (e.key === "ArrowLeft") { e.preventDefault(); showSlide(carousel.i - 1); }
-  if (e.key === "ArrowRight") { e.preventDefault(); showSlide(carousel.i + 1); }
+  if (e.key === "ArrowLeft") { e.preventDefault(); goTo(carousel.i - 1); }
+  if (e.key === "ArrowRight") { e.preventDefault(); goTo(carousel.i + 1); }
 });
 lightboxEl.querySelector(".lb-x").onclick = function (e) { e.stopPropagation(); closeLightbox(); };
-lightboxEl.querySelector(".lb-prev").onclick = function (e) { e.stopPropagation(); showSlide(carousel.i - 1); };
-lightboxEl.querySelector(".lb-next").onclick = function (e) { e.stopPropagation(); showSlide(carousel.i + 1); };
+lightboxEl.querySelector(".lb-prev").onclick = function (e) { e.stopPropagation(); goTo(carousel.i - 1); };
+lightboxEl.querySelector(".lb-next").onclick = function (e) { e.stopPropagation(); goTo(carousel.i + 1); };
 lightboxEl.onclick = function () { closeLightbox(); };
 lightboxEl.querySelector("img").onclick = function (e) { e.stopPropagation(); };
 ["mousedown", "touchstart", "wheel", "dragstart"].forEach(function (ev) {
