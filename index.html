@@ -15,32 +15,38 @@ html,body{height:100%;margin:0;font-family:-apple-system,BlinkMacSystemFont,"Seg
 #theme{right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 82px);width:46px;height:46px;border:0;font-weight:700;font-size:18px;color:#1f6f4a;cursor:pointer}
 #tilt{right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 28px);width:46px;height:46px;border:0;font-weight:700;font-size:14px;color:#1f6f4a;cursor:pointer}
 #debug{left:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 28px);padding:8px 12px;font-size:12px;font-weight:600;max-width:calc(100% - 80px);line-height:1.35}
-.bcard{position:fixed;z-index:3;display:none;opacity:0;transform:translateY(16px) scale(.92);transition:opacity .26s cubic-bezier(.22,1,.36,1),transform .26s cubic-bezier(.22,1,.36,1);background:rgba(255,255,255,.96);color:#12261c;border-radius:14px;box-shadow:0 8px 28px rgba(0,0,0,.22);overflow:auto;box-sizing:border-box;padding:16px 16px 18px}
-.bcard.open{display:block;opacity:1;transform:none}
-.bcard.closing{opacity:0;transform:translateY(16px) scale(.92);transition-duration:.18s}
-.bcard-x{position:absolute;top:8px;right:8px;width:44px;height:44px;border:0;border-radius:12px;background:transparent;font-size:22px;cursor:pointer;color:inherit}
-.bcard h2{margin:0 40px 4px 0;font-size:17px;line-height:1.25;color:#1f6f4a}
-.bcard .kod{margin:0 0 12px;font-size:12px;opacity:.65}
-.bcard h3{margin:12px 0 4px;font-size:12px;letter-spacing:.04em;text-transform:uppercase;opacity:.7}
-.bcard p{margin:0;font-size:14px;line-height:1.4}
-.bcard .pic{margin-top:6px;height:92px;border-radius:10px;background:#d7dde8;display:flex;align-items:center;justify-content:center;font-size:13px;opacity:.75}
-body.night .bcard{background:rgba(15,23,34,.96);color:#e8eef6}
+.backdrop{position:fixed;inset:0;z-index:4;display:none;align-items:center;justify-content:center;padding:calc(12px + env(safe-area-inset-top,0px)) 16px calc(12px + env(safe-area-inset-bottom,0px));background:rgba(6,12,9,0);backdrop-filter:blur(0);-webkit-backdrop-filter:blur(0);transition:background .22s linear}
+.backdrop.show{display:flex}
+.backdrop.open{background:rgba(6,12,9,.62);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+.bcard{position:relative;width:min(92vw,1100px);height:min(86vh,800px);max-height:min(86vh,800px);opacity:0;transform:translateY(24px) scale(.9);transition:opacity .32s cubic-bezier(.2,.9,.3,1.1),transform .32s cubic-bezier(.2,.9,.3,1.1);background:rgba(255,255,255,.97);color:#12261c;border-radius:20px;box-shadow:0 16px 48px rgba(0,0,0,.28);overflow:auto;box-sizing:border-box;padding:28px 28px 24px}
+.backdrop.open .bcard{opacity:1;transform:none}
+.backdrop.closing{background:rgba(6,12,9,0);backdrop-filter:blur(0);-webkit-backdrop-filter:blur(0)}
+.backdrop.closing .bcard{opacity:0;transform:translateY(24px) scale(.9);transition-duration:.2s;transition-timing-function:ease-in}
+.bcard-x{position:absolute;top:12px;right:12px;width:44px;height:44px;border:0;border-radius:12px;background:transparent;font-size:22px;cursor:pointer;color:inherit}
+.bcard h2{margin:0 48px 4px 0;font-size:26px;line-height:1.2;color:#1f6f4a}
+.bcard .kod{margin:0 0 8px;font-size:13px;opacity:.65}
+.bcard h3{margin:16px 0 6px;font-size:12px;letter-spacing:.04em;text-transform:uppercase;opacity:.7}
+.bcard p{margin:0;font-size:15px;line-height:1.45}
+.bgrid{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:stretch;margin-top:12px}
+.bcard .pic{min-height:220px;height:100%;border-radius:16px;background:#d7dde8;display:flex;align-items:center;justify-content:center;font-size:15px;opacity:.8}
+body.night .bcard{background:rgba(15,23,34,.97);color:#e8eef6}
 body.night .bcard h2{color:#5fd29a}
 body.night .bcard .pic{background:#243044}
-@media (min-width:700px){.bcard{top:calc(env(safe-area-inset-top,0px) + 64px);left:12px;width:340px;max-height:calc(100vh - 90px)}}
-@media (max-width:699px){.bcard{left:0;right:0;bottom:0;width:100%;max-height:55vh;border-radius:14px 14px 0 0;padding-bottom:calc(18px + env(safe-area-inset-bottom,0px))}}
-@media (prefers-reduced-motion:reduce){.bcard,.bcard.closing{transform:none;transition:opacity .2s linear}}
+@media (max-width:799px){.bgrid{grid-template-columns:1fr}.bcard{padding:22px 18px 18px}.bcard h2{font-size:20px}.bcard .pic{min-height:160px}}
+@media (prefers-reduced-motion:reduce){.bcard,.backdrop.closing .bcard,.backdrop.open .bcard{transform:none;transition:opacity .2s linear}.backdrop{transition:background .2s linear}}
 </style>
 </head>
 <body>
 <div id="map"></div>
 <div class="chip" id="title"><b>UTeM SunGrid</b><span>Peta Kampus UTeM</span></div>
-<button class="chip" id="tilt">3D</button>
+<button class="chip" id="tilt">2D</button>
 <button class="chip" id="theme" aria-label="Siang atau malam">☀</button>
-<aside id="bcard" class="bcard" aria-hidden="true">
-  <button class="bcard-x" type="button" aria-label="Tutup">×</button>
-  <div id="bcard-body"></div>
-</aside>
+<div id="backdrop" class="backdrop">
+  <div id="bcard" class="bcard" role="dialog" aria-modal="true" aria-labelledby="bcard-title" aria-hidden="true">
+    <button class="bcard-x" type="button" aria-label="Tutup">×</button>
+    <div id="bcard-body"></div>
+  </div>
+</div>
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
 var palettes = {
@@ -67,6 +73,8 @@ var palettes = {
 };
 
 var noLock = /\bnolock\b/.test(location.search);
+var CLICKABLE_FACULTY_ONLY = true;
+var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 var CAMPUS_BOUNDS = [[102.310337, 2.298282], [102.331156, 2.323705]];
 var CAMPUS_POLY = [
   [102.316473, 2.303086], [102.317041, 2.302864], [102.318292, 2.302669],
@@ -99,11 +107,13 @@ var outlineData = {
 };
 
 var BUILDINGS = [
-  { id:"ftkm", name:"Fakulti Teknologi Kejuruteraan Mekanikal (FTKM)", short:"FTKM", lon:102.322973, lat:2.307932, rank:100 },
-  { id:"ftkip", name:"Fakulti Teknologi Kejuruteraan Industri dan Pembuatan (FTKIP)", short:"FTKIP", lon:102.320909, lat:2.307526, rank:100 },
-  { id:"ftmk", name:"Fakulti Teknologi Maklumat dan Komunikasi (FTMK) UTeM", short:"FTMK", lon:102.318871, lat:2.308050, rank:100 },
-  { id:"fkekk", name:"Fakulti Kejuruteraan Elektronik dan Kejuruteraan Komputer (FKEKK) UTeM", short:"FKEKK", lon:102.318239, lat:2.313815, rank:100 },
-  { id:"ftke", name:"Fakulti Teknologi Kejuruteraan Elektrik (FTKE)", short:"FTKE", lon:102.319800, lat:2.314379, rank:100 },
+  { id:"ftkm", name:"Fakulti Teknologi Kejuruteraan Mekanikal (FTKM)", short:"FTKM", lon:102.322973, lat:2.307932, rank:100, isFaculty:true },
+  { id:"ftkip", name:"Fakulti Teknologi Kejuruteraan Industri dan Pembuatan (FTKIP)", short:"FTKIP", lon:102.320909, lat:2.307526, rank:100, isFaculty:true },
+  { id:"ftmk", name:"Fakulti Teknologi Maklumat dan Komunikasi (FTMK) UTeM", short:"FTMK", lon:102.318871, lat:2.308050, rank:100, isFaculty:true },
+  { id:"fkekk", name:"Fakulti Kejuruteraan Elektronik dan Kejuruteraan Komputer (FKEKK) UTeM", short:"FKEKK", lon:102.318239, lat:2.313815, rank:100, isFaculty:true },
+  { id:"ftke", name:"Fakulti Teknologi Kejuruteraan Elektrik (FTKE)", short:"FTKE", lon:102.319800, lat:2.314379, rank:100, isFaculty:true }
+];
+var OTHER_BUILDINGS = [
   { id:"perpustakaan", name:"Perpustakaan Laman Hikmah", short:"Perpustakaan", lon:102.320552, lat:2.309103, rank:100 },
   { id:"canselor", name:"Dewan Canselor", short:"Canselor", lon:102.322283, lat:2.311318, rank:100 },
   { id:"kdk", name:"Kompleks Dewan Kuliah", short:"KDK", lon:102.322510, lat:2.312303, rank:100 },
@@ -141,6 +151,9 @@ var labelData = {
     return { type: "Feature", properties: { id: b.id, name: b.name, short: b.short, rank: b.rank }, geometry: { type: "Point", coordinates: [b.lon, b.lat] } };
   })
 };
+function catalog() {
+  return CLICKABLE_FACULTY_ONLY ? BUILDINGS : BUILDINGS.concat(OTHER_BUILDINGS);
+}
 
 var bldgH = ["max", ["coalesce", ["get", "render_height"], 9], 9];
 var bldgB = ["coalesce", ["get", "render_min_height"], 0];
@@ -211,8 +224,7 @@ function makeLayers(p) {
       layout:{ "symbol-placement":"line", "text-field":["coalesce",["get","name:ms"],["get","name"]], "text-font":["Noto Sans Regular"], "text-size":11 },
       paint:{ "text-color": p.text, "text-halo-color": p.textHalo, "text-halo-width": 1.5 } },
     { id:"place", type:"symbol", source:"omt", "source-layer":"poi", minzoom:16,
-      filter:["in","class","college","university","school","library","place_of_worship","hospital","stadium","town_hall"],
-      layout:{ "text-field":["coalesce",["get","name:ms"],["get","name"]], "text-font":["Noto Sans Regular"], "text-size":12, "text-offset":[0,.6], "text-anchor":"top" },
+      layout:{ "visibility":"none", "text-field":["coalesce",["get","name:ms"],["get","name"]], "text-font":["Noto Sans Regular"], "text-size":12 },
       paint:{ "text-color": p.text, "text-halo-color": p.textHalo, "text-halo-width": 1.5 } }
   ];
 }
@@ -283,30 +295,39 @@ function pointInGeom(pt, geom) {
   return false;
 }
 function buildingAtPoint(pt) {
-  for (var i = 0; i < BUILDINGS.length; i++) if (BUILDINGS[i].lon === pt[0] && BUILDINGS[i].lat === pt[1]) return BUILDINGS[i];
-  for (var k = 0; k < BUILDINGS.length; k++) {
-    if (Math.abs(BUILDINGS[k].lon - pt[0]) < 1e-5 && Math.abs(BUILDINGS[k].lat - pt[1]) < 1e-5) return BUILDINGS[k];
+  var list = catalog();
+  for (var i = 0; i < list.length; i++) if (list[i].lon === pt[0] && list[i].lat === pt[1]) return list[i];
+  for (var k = 0; k < list.length; k++) {
+    if (Math.abs(list[k].lon - pt[0]) < 1e-5 && Math.abs(list[k].lat - pt[1]) < 1e-5) return list[k];
   }
   return null;
 }
 function buildingInGeom(geom) {
-  for (var i = 0; i < BUILDINGS.length; i++) if (pointInGeom([BUILDINGS[i].lon, BUILDINGS[i].lat], geom)) return BUILDINGS[i];
+  var list = catalog();
+  for (var i = 0; i < list.length; i++) if (pointInGeom([list[i].lon, list[i].lat], geom)) return list[i];
   return null;
 }
 
 function renderPopup(b) {
-  var h = "<h2>" + b.name + "</h2>";
+  var h = "<h2 id=\"bcard-title\">" + b.name + "</h2>";
   if (b.unnamed) h += "<p class=\"kod\">Nama belum ditetapkan</p>";
   else if (b.short) h += "<p class=\"kod\">Kod: " + b.short + "</p>";
+  h += "<div class=\"bgrid\"><div>";
   h += "<h3>Maklumat Bangunan</h3><p>Maklumat terperinci akan dipaparkan di sini.</p>";
   h += "<h3>Panel Solar</h3><p>Data panel solar akan ditambah kemudian.</p>";
-  h += "<h3>Gambar</h3><div class=\"pic\">Gambar akan ditambah</div>";
+  h += "</div><div class=\"pic\">Gambar akan ditambah</div></div>";
   return h;
 }
 
+function easeInOutCubic(t) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+var backdrop = document.getElementById("backdrop");
 var card = document.getElementById("bcard");
 var cardBody = document.getElementById("bcard-body");
-var popupOpen = false, popupTimer = 0, selectedSrc = null;
+var closeBtn = document.querySelector(".bcard-x");
+var popupOpen = false, popupTimer = 0, selectedSrc = null, lastFocus = null, fitting = false;
 
 function clearSelected() {
   if (selectedSrc) selectedSrc.setData({ type: "FeatureCollection", features: [] });
@@ -315,40 +336,60 @@ function setSelected(feat) {
   if (!selectedSrc || !feat || !feat.geometry) return;
   selectedSrc.setData({ type: "Feature", geometry: feat.geometry, properties: feat.properties || {} });
 }
+function trapFocus(e) {
+  if (!popupOpen || e.key !== "Tab") return;
+  var focusable = card.querySelectorAll("button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])");
+  if (!focusable.length) return;
+  var first = focusable[0], last = focusable[focusable.length - 1];
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+}
+function recentreCampus() {
+  tilted = false;
+  btn.textContent = "3D";
+  var opts = { padding: { top: 70, bottom: 70, left: 70, right: 70 }, pitch: 0, bearing: 0, essential: true };
+  if (reduceMotion) {
+    map.fitBounds(CAMPUS_BOUNDS, Object.assign(opts, { duration: 0 }));
+    return;
+  }
+  fitting = true;
+  map.fitBounds(CAMPUS_BOUNDS, Object.assign(opts, { duration: 1600, easing: easeInOutCubic }));
+}
 function closePopup() {
   if (!popupOpen) return;
   popupOpen = false;
-  card.classList.add("closing");
+  clearSelected();
+  backdrop.classList.add("closing");
+  backdrop.classList.remove("open");
   card.setAttribute("aria-hidden", "true");
+  document.removeEventListener("keydown", trapFocus);
   clearTimeout(popupTimer);
   popupTimer = setTimeout(function () {
-    card.classList.remove("open", "closing");
-    card.style.display = "none";
-    clearSelected();
-  }, 180);
+    backdrop.classList.remove("show", "closing");
+    if (lastFocus && lastFocus.focus) lastFocus.focus();
+    else map.getCanvas().focus();
+    recentreCampus();
+  }, reduceMotion ? 200 : 200);
 }
 function openPopup(b, feat, lngLat) {
+  lastFocus = document.activeElement;
   cardBody.innerHTML = renderPopup(b);
-  card.style.display = "block";
+  backdrop.classList.add("show");
+  backdrop.classList.remove("closing");
   card.setAttribute("aria-hidden", "false");
-  if (popupOpen) {
-    card.classList.add("open");
-    card.classList.remove("closing");
-  } else {
-    popupOpen = true;
-    card.classList.remove("closing");
-    requestAnimationFrame(function () { card.classList.add("open"); });
-  }
+  popupOpen = true;
+  requestAnimationFrame(function () { backdrop.classList.add("open"); });
   setSelected(feat);
+  closeBtn.focus();
+  document.addEventListener("keydown", trapFocus);
   if (lngLat) {
-    var pad = window.innerWidth >= 700
-      ? { top: 40, left: 360, right: 40, bottom: 40 }
-      : { top: 40, left: 20, right: 20, bottom: Math.round(window.innerHeight * 0.42) };
-    map.easeTo({ center: lngLat, padding: pad, duration: 500, pitch: map.getPitch(), bearing: map.getBearing() });
+    if (reduceMotion) map.jumpTo({ center: lngLat, pitch: map.getPitch(), bearing: map.getBearing() });
+    else map.easeTo({ center: lngLat, duration: 500, pitch: map.getPitch(), bearing: map.getBearing() });
   }
 }
 
 map.on("load", function () {
+  map.getCanvas().tabIndex = 0;
   map.setLight({ anchor: "viewport", color: "#ffffff", intensity: 0.4, position: [1.4, 210, 45] });
   if (!noLock) {
     try {
@@ -419,38 +460,59 @@ map.on("load", function () {
 
 map.on("click", function (e) {
   try {
+    if (popupOpen) return;
     var hit = map.queryRenderedFeatures(e.point, { layers: ["building-labels", "building-dots", "building-3d", "building-roof"] });
-    if (!hit.length) { closePopup(); return; }
+    if (!hit.length) return;
     var feat = hit[0];
     var b = null;
     if (feat.layer && (feat.layer.id === "building-labels" || feat.layer.id === "building-dots")) {
       b = buildingAtPoint(feat.geometry.coordinates) || BUILDINGS.filter(function (x) { return x.id === feat.properties.id; })[0];
     }
     if (!b) b = buildingInGeom(feat.geometry);
-    if (!b) {
+    if (!b && !CLICKABLE_FACULTY_ONLY) {
       var osmName = feat.properties && (feat.properties["name:ms"] || feat.properties.name);
       b = osmName
         ? { name: osmName, short: "", lon: e.lngLat.lng, lat: e.lngLat.lat }
         : { name: "Bangunan", short: "", unnamed: true, lon: e.lngLat.lng, lat: e.lngLat.lat };
     }
+    if (!b) return;
     var poly = hit.filter(function (f) { return f.layer.id === "building-3d" || f.layer.id === "building-roof"; })[0];
     openPopup(b, poly || feat, [b.lon || e.lngLat.lng, b.lat || e.lngLat.lat]);
   } catch (err) {
     console.warn("building click skipped", err);
   }
 });
+function hoverFaculty(e) {
+  try {
+    if (!CLICKABLE_FACULTY_ONLY) { map.getCanvas().style.cursor = "pointer"; return; }
+    if (e.features && e.features[0] && (e.features[0].layer.id === "building-labels" || e.features[0].layer.id === "building-dots")) {
+      map.getCanvas().style.cursor = "pointer";
+      return;
+    }
+    var hits = map.queryRenderedFeatures(e.point, { layers: ["building-3d", "building-roof"] });
+    var ok = false;
+    for (var i = 0; i < hits.length; i++) if (buildingInGeom(hits[i].geometry)) { ok = true; break; }
+    map.getCanvas().style.cursor = ok ? "pointer" : "";
+  } catch (err) {}
+}
 ["building-3d", "building-roof", "building-labels", "building-dots"].forEach(function (id) {
-  map.on("mouseenter", id, function () { map.getCanvas().style.cursor = "pointer"; });
+  map.on("mousemove", id, hoverFaculty);
   map.on("mouseleave", id, function () { map.getCanvas().style.cursor = ""; });
 });
-document.querySelector(".bcard-x").onclick = function () { closePopup(); };
+closeBtn.onclick = function (e) { e.stopPropagation(); closePopup(); };
+card.onclick = function (e) { e.stopPropagation(); };
+backdrop.onclick = function () { closePopup(); };
 document.addEventListener("keydown", function (e) { if (e.key === "Escape") closePopup(); });
+["mousedown", "touchstart", "wheel", "dragstart"].forEach(function (ev) {
+  map.on(ev, function () { if (fitting) { fitting = false; map.stop(); } });
+});
+map.on("moveend", function () { fitting = false; });
 
 var tilted = true, btn = document.getElementById("tilt");
 btn.onclick = function () {
   tilted = !tilted;
   map.easeTo({ pitch: tilted ? 60 : 0, bearing: tilted ? -20 : 0, duration: 700 });
-  btn.textContent = tilted ? "3D" : "2D";
+  btn.textContent = tilted ? "2D" : "3D";
 };
 var tb = document.getElementById("theme");
 tb.onclick = function () {
