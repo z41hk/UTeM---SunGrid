@@ -15,6 +15,21 @@ html,body{height:100%;margin:0;font-family:-apple-system,BlinkMacSystemFont,"Seg
 #theme{right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 82px);width:46px;height:46px;border:0;font-weight:700;font-size:18px;color:#1f6f4a;cursor:pointer}
 #tilt{right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 28px);width:46px;height:46px;border:0;font-weight:700;font-size:14px;color:#1f6f4a;cursor:pointer}
 #debug{left:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 28px);padding:8px 12px;font-size:12px;font-weight:600;max-width:calc(100% - 80px);line-height:1.35}
+.bcard{position:fixed;z-index:3;display:none;opacity:0;transform:translateY(16px) scale(.92);transition:opacity .26s cubic-bezier(.22,1,.36,1),transform .26s cubic-bezier(.22,1,.36,1);background:rgba(255,255,255,.96);color:#12261c;border-radius:14px;box-shadow:0 8px 28px rgba(0,0,0,.22);overflow:auto;box-sizing:border-box;padding:16px 16px 18px}
+.bcard.open{display:block;opacity:1;transform:none}
+.bcard.closing{opacity:0;transform:translateY(16px) scale(.92);transition-duration:.18s}
+.bcard-x{position:absolute;top:8px;right:8px;width:44px;height:44px;border:0;border-radius:12px;background:transparent;font-size:22px;cursor:pointer;color:inherit}
+.bcard h2{margin:0 40px 4px 0;font-size:17px;line-height:1.25;color:#1f6f4a}
+.bcard .kod{margin:0 0 12px;font-size:12px;opacity:.65}
+.bcard h3{margin:12px 0 4px;font-size:12px;letter-spacing:.04em;text-transform:uppercase;opacity:.7}
+.bcard p{margin:0;font-size:14px;line-height:1.4}
+.bcard .pic{margin-top:6px;height:92px;border-radius:10px;background:#d7dde8;display:flex;align-items:center;justify-content:center;font-size:13px;opacity:.75}
+body.night .bcard{background:rgba(15,23,34,.96);color:#e8eef6}
+body.night .bcard h2{color:#5fd29a}
+body.night .bcard .pic{background:#243044}
+@media (min-width:700px){.bcard{top:calc(env(safe-area-inset-top,0px) + 64px);left:12px;width:340px;max-height:calc(100vh - 90px)}}
+@media (max-width:699px){.bcard{left:0;right:0;bottom:0;width:100%;max-height:55vh;border-radius:14px 14px 0 0;padding-bottom:calc(18px + env(safe-area-inset-bottom,0px))}}
+@media (prefers-reduced-motion:reduce){.bcard,.bcard.closing{transform:none;transition:opacity .2s linear}}
 </style>
 </head>
 <body>
@@ -22,6 +37,10 @@ html,body{height:100%;margin:0;font-family:-apple-system,BlinkMacSystemFont,"Seg
 <div class="chip" id="title"><b>UTeM SunGrid</b><span>Peta Kampus UTeM</span></div>
 <button class="chip" id="tilt">3D</button>
 <button class="chip" id="theme" aria-label="Siang atau malam">☀</button>
+<aside id="bcard" class="bcard" aria-hidden="true">
+  <button class="bcard-x" type="button" aria-label="Tutup">×</button>
+  <div id="bcard-body"></div>
+</aside>
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
 var palettes = {
@@ -32,7 +51,8 @@ var palettes = {
     roadPrimaryCasing:"#e0b23c", roadService:"#e8ebf1",
     buildingLow:"#fff6e6", buildingMid:"#e4dcff", buildingHigh:"#cfe0ff",
     roofLow:"#fffdf8", roofMid:"#f3eeff", roofHigh:"#e8f1ff",
-    text:"#2c3a4a", textHalo:"#ffffff", outline:"#1f6f4a"
+    text:"#2c3a4a", textHalo:"#ffffff", outline:"#1f6f4a",
+    label:"#1b2a38", labelHalo:"#ffffff", dot:"#1f6f4a", selected:"#1f6f4a"
   },
   night: {
     bg:"#0f1722", campus:"#1a2433", grass:"#1d3a2b", woods:"#15291f",
@@ -41,7 +61,8 @@ var palettes = {
     roadPrimaryCasing:"#8a7018", roadService:"#243044",
     buildingLow:"#3b4a66", buildingMid:"#4c5e82", buildingHigh:"#5a6f99",
     roofLow:"#5c6e8c", roofMid:"#6b7fa3", roofHigh:"#7d91b5",
-    text:"#ffffff", textHalo:"rgba(0,0,0,.75)", outline:"#5fd29a"
+    text:"#ffffff", textHalo:"rgba(0,0,0,.75)", outline:"#5fd29a",
+    label:"#ffffff", labelHalo:"rgba(0,0,0,.8)", dot:"#5fd29a", selected:"#5fd29a"
   }
 };
 
@@ -75,6 +96,50 @@ var maskData = {
 var outlineData = {
   type: "Feature",
   geometry: { type: "LineString", coordinates: CAMPUS_POLY }
+};
+
+var BUILDINGS = [
+  { id:"ftkm", name:"Fakulti Teknologi Kejuruteraan Mekanikal (FTKM)", short:"FTKM", lon:102.322973, lat:2.307932, rank:100 },
+  { id:"ftkip", name:"Fakulti Teknologi Kejuruteraan Industri dan Pembuatan (FTKIP)", short:"FTKIP", lon:102.320909, lat:2.307526, rank:100 },
+  { id:"ftmk", name:"Fakulti Teknologi Maklumat dan Komunikasi (FTMK) UTeM", short:"FTMK", lon:102.318871, lat:2.308050, rank:100 },
+  { id:"fkekk", name:"Fakulti Kejuruteraan Elektronik dan Kejuruteraan Komputer (FKEKK) UTeM", short:"FKEKK", lon:102.318239, lat:2.313815, rank:100 },
+  { id:"ftke", name:"Fakulti Teknologi Kejuruteraan Elektrik (FTKE)", short:"FTKE", lon:102.319800, lat:2.314379, rank:100 },
+  { id:"perpustakaan", name:"Perpustakaan Laman Hikmah", short:"Perpustakaan", lon:102.320552, lat:2.309103, rank:100 },
+  { id:"canselor", name:"Dewan Canselor", short:"Canselor", lon:102.322283, lat:2.311318, rank:100 },
+  { id:"kdk", name:"Kompleks Dewan Kuliah", short:"KDK", lon:102.322510, lat:2.312303, rank:100 },
+  { id:"masjid", name:"Masjid Sayyidina Abu Bakar", short:"Masjid", lon:102.318586, lat:2.311968, rank:100 },
+  { id:"sps", name:"Sekolah Pengajian Siswazah", short:"SPS", lon:102.318589, lat:2.305707, rank:100 },
+  { id:"crim", name:"Pusat Pengurusan Penyelidikan dan Inovasi (CRIM)", short:"CRIM", lon:102.319085, lat:2.306606, rank:100 },
+  { id:"hepa", name:"Bangunan HEPA", short:"HEPA", lon:102.320922, lat:2.313161, rank:90 },
+  { id:"stadium", name:"Stadium UTeM", short:"Stadium", lon:102.321244, lat:2.317880, rank:90 },
+  { id:"spab", name:"Sekolah Pengajian Antarabangsa dan Bahasa Global", short:"SPAB", lon:102.319503, lat:2.309286, rank:80 },
+  { id:"kilang", name:"Kilang Pengajaran Pusat Pembuatan Termaju", short:"Kilang", lon:102.319454, lat:2.306062, rank:80 },
+  { id:"pppk", name:"Pusat Perkhidmatan Pengetahuan dan Komunikasi", short:"PPPK", lon:102.319300, lat:2.310826, rank:80 },
+  { id:"canselori", name:"Canselori", short:"Canselori", lon:102.321265, lat:2.313763, rank:80 },
+  { id:"pembangunan", name:"Pejabat Pembangunan", short:"Pembangunan", lon:102.324562, lat:2.315910, rank:70 },
+  { id:"ppp", name:"Pusat Persatuan Pelajar", short:"PPP", lon:102.318640, lat:2.310090, rank:70 },
+  { id:"uace", name:"Pusat Alumni, Kerjaya & Kebolehpasaran (U-ACE)", short:"U-ACE", lon:102.323448, lat:2.314085, rank:70 },
+  { id:"bendahari", name:"Pejabat Bendahari", short:"Bendahari", lon:102.321164, lat:2.313427, rank:70 },
+  { id:"kesihatan", name:"Pusat Kesihatan", short:"Kesihatan", lon:102.317562, lat:2.309984, rank:70 },
+  { id:"keselamatan", name:"Pejabat Keselamatan (Polis Bantuan UTeM)", short:"Keselamatan", lon:102.316415, lat:2.305050, rank:70 },
+  { id:"kka", name:"Kolej Kediaman A", short:"KK-A", lon:102.316027, lat:2.314588, rank:40 },
+  { id:"kkb", name:"Kolej Kediaman B", short:"KK-B", lon:102.315662, lat:2.316203, rank:40 },
+  { id:"kasturi", name:"Kasturi", short:"Kasturi", lon:102.314576, lat:2.311015, rank:40 },
+  { id:"lekiu", name:"Lekiu", short:"Lekiu", lon:102.313701, lat:2.311078, rank:40 },
+  { id:"lekir", name:"Lekir", short:"Lekir", lon:102.313990, lat:2.310442, rank:40 },
+  { id:"jebat", name:"Jebat", short:"Jebat", lon:102.314340, lat:2.308714, rank:40 },
+  { id:"tuah", name:"Tuah", short:"Tuah", lon:102.315031, lat:2.308714, rank:40 },
+  { id:"satria", name:"Kafeteria Satria", short:"Satria", lon:102.314953, lat:2.310347, rank:30 },
+  { id:"sasana", name:"Sasana Niaga", short:"Sasana", lon:102.318480, lat:2.311336, rank:30 },
+  { id:"kafe1", name:"Kafeteria Pelajar 1", short:"Kafe 1", lon:102.318919, lat:2.313648, rank:30 },
+  { id:"kafe2", name:"Kafeteria Pelajar 2", short:"Kafe 2", lon:102.318624, lat:2.310708, rank:30 },
+  { id:"kafe3", name:"Kafeteria Pelajar 3", short:"Kafe 3", lon:102.318982, lat:2.305474, rank:30 }
+];
+var labelData = {
+  type: "FeatureCollection",
+  features: BUILDINGS.map(function (b) {
+    return { type: "Feature", properties: { id: b.id, name: b.name, short: b.short, rank: b.rank }, geometry: { type: "Point", coordinates: [b.lon, b.lat] } };
+  })
 };
 
 var bldgH = ["max", ["coalesce", ["get", "render_height"], 9], 9];
@@ -172,6 +237,13 @@ function applyPalette(p) {
   map.setPaintProperty("place", "text-halo-color", p.textHalo);
   if (map.getLayer("mask-fill")) map.setPaintProperty("mask-fill", "fill-color", p.bg);
   if (map.getLayer("campus-outline")) map.setPaintProperty("campus-outline", "line-color", p.outline);
+  if (map.getLayer("building-dots")) map.setPaintProperty("building-dots", "circle-color", p.dot);
+  if (map.getLayer("building-labels")) {
+    map.setPaintProperty("building-labels", "text-color", p.label);
+    map.setPaintProperty("building-labels", "text-halo-color", p.labelHalo);
+  }
+  if (map.getLayer("selected-bldg")) map.setPaintProperty("selected-bldg", "fill-extrusion-color", p.selected);
+  document.body.classList.toggle("night", night);
 }
 
 var night = false;
@@ -194,26 +266,185 @@ if (!noLock) mapOpts.maxBounds = CAMPUS_BOUNDS;
 var map = new maplibregl.Map(mapOpts);
 map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: "© OpenStreetMap contributors · OpenFreeMap" }), "bottom-left");
 map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
+function pointInRing(pt, ring) {
+  var inside = false, i, j, xi, yi, xj, yj;
+  for (i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    xi = ring[i][0]; yi = ring[i][1]; xj = ring[j][0]; yj = ring[j][1];
+    if (((yi > pt[1]) !== (yj > pt[1])) && (pt[0] < (xj - xi) * (pt[1] - yi) / ((yj - yi) || 1e-12) + xi)) inside = !inside;
+  }
+  return inside;
+}
+function pointInGeom(pt, geom) {
+  if (!geom) return false;
+  if (geom.type === "Polygon") return pointInRing(pt, geom.coordinates[0]);
+  if (geom.type === "MultiPolygon") {
+    for (var i = 0; i < geom.coordinates.length; i++) if (pointInRing(pt, geom.coordinates[i][0])) return true;
+  }
+  return false;
+}
+function buildingAtPoint(pt) {
+  for (var i = 0; i < BUILDINGS.length; i++) if (BUILDINGS[i].lon === pt[0] && BUILDINGS[i].lat === pt[1]) return BUILDINGS[i];
+  for (var k = 0; k < BUILDINGS.length; k++) {
+    if (Math.abs(BUILDINGS[k].lon - pt[0]) < 1e-5 && Math.abs(BUILDINGS[k].lat - pt[1]) < 1e-5) return BUILDINGS[k];
+  }
+  return null;
+}
+function buildingInGeom(geom) {
+  for (var i = 0; i < BUILDINGS.length; i++) if (pointInGeom([BUILDINGS[i].lon, BUILDINGS[i].lat], geom)) return BUILDINGS[i];
+  return null;
+}
+
+function renderPopup(b) {
+  var h = "<h2>" + b.name + "</h2>";
+  if (b.unnamed) h += "<p class=\"kod\">Nama belum ditetapkan</p>";
+  else if (b.short) h += "<p class=\"kod\">Kod: " + b.short + "</p>";
+  h += "<h3>Maklumat Bangunan</h3><p>Maklumat terperinci akan dipaparkan di sini.</p>";
+  h += "<h3>Panel Solar</h3><p>Data panel solar akan ditambah kemudian.</p>";
+  h += "<h3>Gambar</h3><div class=\"pic\">Gambar akan ditambah</div>";
+  return h;
+}
+
+var card = document.getElementById("bcard");
+var cardBody = document.getElementById("bcard-body");
+var popupOpen = false, popupTimer = 0, selectedSrc = null;
+
+function clearSelected() {
+  if (selectedSrc) selectedSrc.setData({ type: "FeatureCollection", features: [] });
+}
+function setSelected(feat) {
+  if (!selectedSrc || !feat || !feat.geometry) return;
+  selectedSrc.setData({ type: "Feature", geometry: feat.geometry, properties: feat.properties || {} });
+}
+function closePopup() {
+  if (!popupOpen) return;
+  popupOpen = false;
+  card.classList.add("closing");
+  card.setAttribute("aria-hidden", "true");
+  clearTimeout(popupTimer);
+  popupTimer = setTimeout(function () {
+    card.classList.remove("open", "closing");
+    card.style.display = "none";
+    clearSelected();
+  }, 180);
+}
+function openPopup(b, feat, lngLat) {
+  cardBody.innerHTML = renderPopup(b);
+  card.style.display = "block";
+  card.setAttribute("aria-hidden", "false");
+  if (popupOpen) {
+    card.classList.add("open");
+    card.classList.remove("closing");
+  } else {
+    popupOpen = true;
+    card.classList.remove("closing");
+    requestAnimationFrame(function () { card.classList.add("open"); });
+  }
+  setSelected(feat);
+  if (lngLat) {
+    var pad = window.innerWidth >= 700
+      ? { top: 40, left: 360, right: 40, bottom: 40 }
+      : { top: 40, left: 20, right: 20, bottom: Math.round(window.innerHeight * 0.42) };
+    map.easeTo({ center: lngLat, padding: pad, duration: 500, pitch: map.getPitch(), bearing: map.getBearing() });
+  }
+}
+
 map.on("load", function () {
   map.setLight({ anchor: "viewport", color: "#ffffff", intensity: 0.4, position: [1.4, 210, 45] });
-  if (noLock) return;
+  if (!noLock) {
+    try {
+      map.setMaxBounds(CAMPUS_BOUNDS);
+      map.addSource("mask", { type: "geojson", data: maskData });
+      map.addSource("campus-line", { type: "geojson", data: outlineData });
+      var pLock = night ? palettes.night : palettes.day;
+      map.addLayer({
+        id: "mask-fill", type: "fill", source: "mask",
+        paint: { "fill-color": pLock.bg, "fill-opacity": 0.85, "fill-antialias": true }
+      }, "road-name");
+      map.addLayer({
+        id: "campus-outline", type: "line", source: "campus-line",
+        paint: { "line-color": pLock.outline, "line-width": 2, "line-opacity": 0.8 }
+      }, "road-name");
+    } catch (e) {
+      console.warn("campus lock skipped", e);
+    }
+  }
   try {
-    map.setMaxBounds(CAMPUS_BOUNDS);
-    map.addSource("mask", { type: "geojson", data: maskData });
-    map.addSource("campus-line", { type: "geojson", data: outlineData });
     var p = night ? palettes.night : palettes.day;
+    map.addSource("building-labels", { type: "geojson", data: labelData });
+    map.addSource("selected", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+    selectedSrc = map.getSource("selected");
     map.addLayer({
-      id: "mask-fill", type: "fill", source: "mask",
-      paint: { "fill-color": p.bg, "fill-opacity": 0.85, "fill-antialias": true }
-    }, "road-name");
+      id: "selected-bldg", type: "fill-extrusion", source: "selected",
+      paint: {
+        "fill-extrusion-color": p.selected,
+        "fill-extrusion-height": bldgH,
+        "fill-extrusion-base": bldgB,
+        "fill-extrusion-opacity": 0.95
+      }
+    });
     map.addLayer({
-      id: "campus-outline", type: "line", source: "campus-line",
-      paint: { "line-color": p.outline, "line-width": 2, "line-opacity": 0.8 }
-    }, "road-name");
+      id: "building-dots", type: "circle", source: "building-labels",
+      paint: {
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 15, 3, 19, 5],
+        "circle-color": p.dot,
+        "circle-stroke-width": 1.5,
+        "circle-stroke-color": "#ffffff"
+      }
+    });
+    map.addLayer({
+      id: "building-labels", type: "symbol", source: "building-labels", minzoom: 0,
+      layout: {
+        "text-field": ["step", ["zoom"], ["get", "short"], 16.8, ["get", "name"]],
+        "text-font": ["Noto Sans Bold"],
+        "text-size": ["interpolate", ["linear"], ["zoom"], 15, 10, 19, 14],
+        "text-max-width": 8,
+        "text-anchor": "bottom",
+        "text-offset": [0, -0.3],
+        "text-pitch-alignment": "viewport",
+        "text-rotation-alignment": "viewport",
+        "text-allow-overlap": true,
+        "text-ignore-placement": true,
+        "symbol-sort-key": ["-", ["get", "rank"]]
+      },
+      paint: {
+        "text-color": p.label,
+        "text-halo-color": p.labelHalo,
+        "text-halo-width": 2
+      }
+    });
   } catch (e) {
-    console.warn("campus lock skipped", e);
+    console.warn("building labels skipped", e);
   }
 });
+
+map.on("click", function (e) {
+  try {
+    var hit = map.queryRenderedFeatures(e.point, { layers: ["building-labels", "building-dots", "building-3d", "building-roof"] });
+    if (!hit.length) { closePopup(); return; }
+    var feat = hit[0];
+    var b = null;
+    if (feat.layer && (feat.layer.id === "building-labels" || feat.layer.id === "building-dots")) {
+      b = buildingAtPoint(feat.geometry.coordinates) || BUILDINGS.filter(function (x) { return x.id === feat.properties.id; })[0];
+    }
+    if (!b) b = buildingInGeom(feat.geometry);
+    if (!b) {
+      var osmName = feat.properties && (feat.properties["name:ms"] || feat.properties.name);
+      b = osmName
+        ? { name: osmName, short: "", lon: e.lngLat.lng, lat: e.lngLat.lat }
+        : { name: "Bangunan", short: "", unnamed: true, lon: e.lngLat.lng, lat: e.lngLat.lat };
+    }
+    var poly = hit.filter(function (f) { return f.layer.id === "building-3d" || f.layer.id === "building-roof"; })[0];
+    openPopup(b, poly || feat, [b.lon || e.lngLat.lng, b.lat || e.lngLat.lat]);
+  } catch (err) {
+    console.warn("building click skipped", err);
+  }
+});
+["building-3d", "building-roof", "building-labels", "building-dots"].forEach(function (id) {
+  map.on("mouseenter", id, function () { map.getCanvas().style.cursor = "pointer"; });
+  map.on("mouseleave", id, function () { map.getCanvas().style.cursor = ""; });
+});
+document.querySelector(".bcard-x").onclick = function () { closePopup(); };
+document.addEventListener("keydown", function (e) { if (e.key === "Escape") closePopup(); });
 
 var tilted = true, btn = document.getElementById("tilt");
 btn.onclick = function () {
