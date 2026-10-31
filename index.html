@@ -28,11 +28,42 @@ html,body{height:100%;margin:0;font-family:-apple-system,BlinkMacSystemFont,"Seg
 .bcard h3{margin:16px 0 6px;font-size:12px;letter-spacing:.04em;text-transform:uppercase;opacity:.7}
 .bcard p{margin:0;font-size:15px;line-height:1.45}
 .bgrid{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:stretch;margin-top:12px}
+.bgrid.has-photos{grid-template-columns:40% 60%}
 .bcard .pic{min-height:220px;height:100%;border-radius:16px;background:#d7dde8;display:flex;align-items:center;justify-content:center;font-size:15px;opacity:.8}
+.carousel{display:flex;flex-direction:column;min-width:0}
+.carousel-frame{position:relative;aspect-ratio:4/3;background:#d7dde8;border-radius:14px;overflow:hidden}
+.carousel-track{display:flex;height:100%;transition:transform .3s ease}
+.carousel-slide{flex:0 0 100%;height:100%;display:flex;align-items:center;justify-content:center;position:relative}
+.carousel-slide img{max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;cursor:zoom-in}
+.carousel-skel{position:absolute;inset:0;background:linear-gradient(90deg,#d7dde8 0%,#eceff4 50%,#d7dde8 100%);background-size:200% 100%;animation:skel 1.2s linear infinite}
+.carousel-err{font-size:14px;opacity:.75;padding:16px;text-align:center}
+.carousel-nav{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:44px;border:0;border-radius:50%;background:rgba(255,255,255,.9);color:#12261c;font-size:22px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.18);z-index:1}
+.carousel-prev{left:8px}
+.carousel-next{right:8px}
+.carousel-badge{position:absolute;top:10px;left:10px;background:#1f6f4a;color:#fff;font-size:11px;letter-spacing:.04em;text-transform:uppercase;padding:4px 8px;border-radius:8px;z-index:1}
+.carousel-meta{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-top:10px}
+.carousel-count{font-size:13px;opacity:.7;min-width:3.2em}
+.carousel-cap{flex:1;font-size:14px}
+.carousel-dots{display:flex;gap:6px;flex-wrap:wrap}
+.carousel-dot{width:10px;height:10px;padding:0;border:0;border-radius:50%;background:#c5ccd6;cursor:pointer}
+.carousel-dot.on{background:#1f6f4a}
+.lightbox{position:fixed;inset:0;z-index:6;display:none;align-items:center;justify-content:center;background:rgba(6,12,9,.86);padding:16px}
+.lightbox.show{display:flex}
+.lightbox img{max-width:96vw;max-height:90vh;object-fit:contain;border-radius:8px}
+.lightbox button{position:absolute;width:44px;height:44px;border:0;border-radius:50%;background:rgba(255,255,255,.92);color:#12261c;font-size:22px;cursor:pointer}
+.lightbox .lb-x{top:12px;right:12px}
+.lightbox .lb-prev{left:12px;top:50%;transform:translateY(-50%)}
+.lightbox .lb-next{right:12px;top:50%;transform:translateY(-50%)}
+@keyframes skel{0%{background-position:100% 0}100%{background-position:-100% 0}}
 body.night .bcard{background:rgba(15,23,34,.97);color:#e8eef6}
 body.night .bcard h2{color:#5fd29a}
-body.night .bcard .pic{background:#243044}
-@media (max-width:799px){.bgrid{grid-template-columns:1fr}.bcard{padding:22px 18px 18px}.bcard h2{font-size:20px}.bcard .pic{min-height:160px}}
+body.night .bcard .pic,body.night .carousel-frame{background:#243044}
+body.night .carousel-nav,body.night .lightbox button{background:rgba(15,23,34,.92);color:#e8eef6}
+body.night .carousel-dot{background:#3b4a66}
+body.night .carousel-dot.on{background:#5fd29a}
+body.night .carousel-badge{background:#5fd29a;color:#0f1722}
+@media (max-width:799px){.bgrid,.bgrid.has-photos{grid-template-columns:1fr}.bcard{padding:22px 18px 18px}.bcard h2{font-size:20px}.bcard .pic{min-height:160px}}
+@media (prefers-reduced-motion:reduce){.bcard,.backdrop.closing .bcard,.backdrop.open .bcard{transform:none;transition:opacity .2s linear}.backdrop{transition:background .2s linear}.carousel-track{transition:opacity .2s linear}.carousel-skel{animation:none}}
 @media (prefers-reduced-motion:reduce){.bcard,.backdrop.closing .bcard,.backdrop.open .bcard{transform:none;transition:opacity .2s linear}.backdrop{transition:background .2s linear}}
 </style>
 </head>
@@ -46,6 +77,12 @@ body.night .bcard .pic{background:#243044}
     <button class="bcard-x" type="button" aria-label="Tutup">×</button>
     <div id="bcard-body"></div>
   </div>
+</div>
+<div id="lightbox" class="lightbox" hidden>
+  <button type="button" class="lb-x" aria-label="Tutup gambar">×</button>
+  <button type="button" class="lb-prev" aria-label="Gambar sebelumnya">‹</button>
+  <img alt="">
+  <button type="button" class="lb-next" aria-label="Gambar seterusnya">›</button>
 </div>
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
@@ -111,8 +148,20 @@ var BUILDINGS = [
   { id:"ftkm", name:"Fakulti Teknologi Kejuruteraan Mekanikal (FTKM)", short:"FTKM", lon:102.322973, lat:2.307932, rank:100, isFaculty:true },
   { id:"ftkip", name:"Fakulti Teknologi Kejuruteraan Industri dan Pembuatan (FTKIP)", short:"FTKIP", lon:102.320909, lat:2.307526, rank:100, isFaculty:true },
   { id:"ftmk", name:"Fakulti Teknologi Maklumat dan Komunikasi (FTMK) UTeM", short:"FTMK", lon:102.318871, lat:2.308050, rank:100, isFaculty:true },
-  { id:"fkekk", name:"Fakulti Kejuruteraan Elektronik dan Kejuruteraan Komputer (FKEKK) UTeM", short:"FKEKK", lon:102.318239, lat:2.313815, rank:100, isFaculty:true },
-  { id:"ftke", name:"Fakulti Teknologi Kejuruteraan Elektrik (FTKE)", short:"FTKE", lon:102.319800, lat:2.314379, rank:100, isFaculty:true }
+  { id:"fkekk", name:"Fakulti Kejuruteraan Elektronik dan Kejuruteraan Komputer (FKEKK) UTeM", short:"FKEKK", lon:102.318239, lat:2.313815, rank:100, isFaculty:true,
+    images:[
+      { src:"images/fkekk/1.jpg", caption:"Panel solar FKEKK – gambar 1", ref:false },
+      { src:"images/fkekk/2.jpg", caption:"Panel solar FKEKK – gambar 2", ref:false },
+      { src:"images/fkekk/2-rujukan.jpg", caption:"Rujukan", ref:true },
+      { src:"images/fkekk/3.jpg", caption:"Panel solar FKEKK – gambar 3", ref:false }
+    ] },
+  { id:"ftke", name:"Fakulti Teknologi Kejuruteraan Elektrik (FTKE)", short:"FTKE", lon:102.319800, lat:2.314379, rank:100, isFaculty:true,
+    images:[
+      { src:"images/ftke/1.jpg", caption:"Panel solar FTKE – gambar 1", ref:false },
+      { src:"images/ftke/2.jpg", caption:"Panel solar FTKE – gambar 2", ref:false },
+      { src:"images/ftke/3.jpg", caption:"Panel solar FTKE – gambar 3", ref:false },
+      { src:"images/ftke/4.jpg", caption:"Panel solar FTKE – gambar 4", ref:false }
+    ] }
 ];
 var OTHER_BUILDINGS = [
   { id:"perpustakaan", name:"Perpustakaan Laman Hikmah", short:"Perpustakaan", lon:102.320552, lat:2.309103, rank:100 },
@@ -309,14 +358,37 @@ function buildingInGeom(geom) {
   return null;
 }
 
+function renderCarousel(b) {
+  var imgs = b.images;
+  var h = "<div class=\"carousel\" data-count=\"" + imgs.length + "\">";
+  h += "<div class=\"carousel-frame\"><div class=\"carousel-track\">";
+  for (var i = 0; i < imgs.length; i++) {
+    var im = imgs[i];
+    h += "<div class=\"carousel-slide\">";
+    if (im.ref) h += "<span class=\"carousel-badge\">Rujukan</span>";
+    h += "<div class=\"carousel-skel\"></div>";
+    h += "<img alt=\"" + im.caption + "\" data-src=\"" + im.src + "\"" + (i === 0 ? " src=\"" + im.src + "\"" : " loading=\"lazy\"") + ">";
+    h += "</div>";
+  }
+  h += "</div>";
+  h += "<button type=\"button\" class=\"carousel-nav carousel-prev\" aria-label=\"Gambar sebelumnya\">‹</button>";
+  h += "<button type=\"button\" class=\"carousel-nav carousel-next\" aria-label=\"Gambar seterusnya\">›</button>";
+  h += "</div><div class=\"carousel-meta\"><span class=\"carousel-count\"></span><p class=\"carousel-cap\"></p><div class=\"carousel-dots\">";
+  for (var d = 0; d < imgs.length; d++) h += "<button type=\"button\" class=\"carousel-dot\" aria-label=\"Gambar " + (d + 1) + "\"></button>";
+  h += "</div></div></div>";
+  return h;
+}
 function renderPopup(b) {
   var h = "<h2 id=\"bcard-title\">" + b.name + "</h2>";
   if (b.unnamed) h += "<p class=\"kod\">Nama belum ditetapkan</p>";
   else if (b.short) h += "<p class=\"kod\">Kod: " + b.short + "</p>";
-  h += "<div class=\"bgrid\"><div>";
+  var photos = b.images && b.images.length;
+  h += "<div class=\"bgrid" + (photos ? " has-photos" : "") + "\"><div>";
   h += "<h3>Maklumat Bangunan</h3><p>Maklumat terperinci akan dipaparkan di sini.</p>";
   h += "<h3>Panel Solar</h3><p>Data panel solar akan ditambah kemudian.</p>";
-  h += "</div><div class=\"pic\">Gambar akan ditambah</div></div>";
+  h += "</div>";
+  h += photos ? renderCarousel(b) : "<div class=\"pic\">Gambar akan ditambah</div>";
+  h += "</div>";
   return h;
 }
 
@@ -328,7 +400,115 @@ var backdrop = document.getElementById("backdrop");
 var card = document.getElementById("bcard");
 var cardBody = document.getElementById("bcard-body");
 var closeBtn = document.querySelector(".bcard-x");
+var lightboxEl = document.getElementById("lightbox");
 var popupOpen = false, popupTimer = 0, selectedSrc = null, lastFocus = null, fitting = false;
+var carousel = { slides: [], i: 0, building: null };
+
+function preloadSlide(i) {
+  if (!carousel.building || !carousel.building.images || !carousel.building.images[i]) return;
+  var img = new Image();
+  img.src = carousel.building.images[i].src;
+}
+function showSlide(i) {
+  try {
+    var n = carousel.slides.length;
+    if (!n) return;
+    carousel.i = (i + n) % n;
+    var track = card.querySelector(".carousel-track");
+    var cap = card.querySelector(".carousel-cap");
+    var count = card.querySelector(".carousel-count");
+    var dots = card.querySelectorAll(".carousel-dot");
+    if (reduceMotion && track) {
+      track.style.transform = "none";
+      for (var s = 0; s < carousel.slides.length; s++) carousel.slides[s].style.opacity = s === carousel.i ? "1" : "0";
+      track.style.position = "relative";
+      for (var t = 0; t < carousel.slides.length; t++) {
+        carousel.slides[t].style.position = t === carousel.i ? "relative" : "absolute";
+        carousel.slides[t].style.inset = "0";
+      }
+    } else if (track) {
+      track.style.transform = "translateX(-" + (carousel.i * 100) + "%)";
+    }
+    var im = carousel.building.images[carousel.i];
+    if (cap) cap.textContent = im.caption;
+    if (count) count.textContent = (carousel.i + 1) + " / " + n;
+    for (var d = 0; d < dots.length; d++) dots[d].classList.toggle("on", d === carousel.i);
+    var slide = carousel.slides[carousel.i];
+    var imgEl = slide && slide.querySelector("img");
+    if (imgEl && !imgEl.getAttribute("src")) imgEl.src = imgEl.getAttribute("data-src");
+    preloadSlide((carousel.i + 1) % n);
+    if (lightboxEl.classList.contains("show")) {
+      var lbImg = lightboxEl.querySelector("img");
+      lbImg.src = im.src;
+      lbImg.alt = im.caption;
+    }
+  } catch (e) {
+    console.warn("carousel slide skipped", e);
+  }
+}
+function bindCarousel(b) {
+  try {
+    carousel.building = b;
+    carousel.slides = Array.prototype.slice.call(card.querySelectorAll(".carousel-slide"));
+    carousel.i = 0;
+    if (!carousel.slides.length) return;
+    var frame = card.querySelector(".carousel-frame");
+    var prev = card.querySelector(".carousel-prev");
+    var next = card.querySelector(".carousel-next");
+    var dots = card.querySelectorAll(".carousel-dot");
+    if (prev) prev.onclick = function (e) { e.stopPropagation(); showSlide(carousel.i - 1); };
+    if (next) next.onclick = function (e) { e.stopPropagation(); showSlide(carousel.i + 1); };
+    for (var d = 0; d < dots.length; d++) (function (idx) {
+      dots[idx].onclick = function (e) { e.stopPropagation(); showSlide(idx); };
+    })(d);
+    carousel.slides.forEach(function (slide) {
+      var img = slide.querySelector("img");
+      var skel = slide.querySelector(".carousel-skel");
+      if (!img) return;
+      img.onload = function () { if (skel) skel.remove(); };
+      img.onerror = function () {
+        if (skel) skel.remove();
+        img.style.display = "none";
+        var err = document.createElement("div");
+        err.className = "carousel-err";
+        err.textContent = "Gambar tidak dapat dimuatkan";
+        slide.appendChild(err);
+      };
+      img.onclick = function (e) { e.stopPropagation(); openLightbox(); };
+      if (img.complete && img.naturalWidth) img.onload();
+    });
+    var startX = 0, startY = 0, swiping = false;
+    if (frame) {
+      frame.onpointerdown = function (e) {
+        if (e.pointerType === "mouse" && e.button !== 0) return;
+        startX = e.clientX; startY = e.clientY; swiping = true;
+        try { frame.setPointerCapture(e.pointerId); } catch (err) {}
+      };
+      frame.onpointerup = function (e) {
+        if (!swiping) return;
+        swiping = false;
+        var dx = e.clientX - startX, dy = e.clientY - startY;
+        if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) showSlide(carousel.i + (dx < 0 ? 1 : -1));
+      };
+    }
+    showSlide(0);
+  } catch (e) {
+    console.warn("carousel skipped", e);
+  }
+}
+function openLightbox() {
+  if (!carousel.building || !carousel.building.images) return;
+  var im = carousel.building.images[carousel.i];
+  var lbImg = lightboxEl.querySelector("img");
+  lbImg.src = im.src;
+  lbImg.alt = im.caption;
+  lightboxEl.hidden = false;
+  lightboxEl.classList.add("show");
+}
+function closeLightbox() {
+  lightboxEl.classList.remove("show");
+  lightboxEl.hidden = true;
+}
 
 function clearSelected() {
   if (selectedSrc) selectedSrc.setData({ type: "FeatureCollection", features: [] });
@@ -381,6 +561,7 @@ function recentreCampus() {
 function closePopup() {
   if (!popupOpen) return;
   popupOpen = false;
+  closeLightbox();
   fadeSelected();
   backdrop.classList.add("closing");
   backdrop.classList.remove("open");
@@ -404,6 +585,7 @@ function openPopup(b, feat, lngLat) {
   popupOpen = true;
   requestAnimationFrame(function () { backdrop.classList.add("open"); });
   setSelected(feat);
+  if (b.images && b.images.length) bindCarousel(b);
   closeBtn.focus();
   document.addEventListener("keydown", trapFocus);
   if (lngLat) {
@@ -526,7 +708,21 @@ function hoverFaculty(e) {
 closeBtn.onclick = function (e) { e.stopPropagation(); closePopup(); };
 card.onclick = function (e) { e.stopPropagation(); };
 backdrop.onclick = function () { closePopup(); };
-document.addEventListener("keydown", function (e) { if (e.key === "Escape") closePopup(); });
+document.addEventListener("keydown", function (e) {
+  if (e.key === "Escape") {
+    if (lightboxEl.classList.contains("show")) { e.preventDefault(); closeLightbox(); return; }
+    closePopup();
+    return;
+  }
+  if (!popupOpen || !carousel.slides.length) return;
+  if (e.key === "ArrowLeft") { e.preventDefault(); showSlide(carousel.i - 1); }
+  if (e.key === "ArrowRight") { e.preventDefault(); showSlide(carousel.i + 1); }
+});
+lightboxEl.querySelector(".lb-x").onclick = function (e) { e.stopPropagation(); closeLightbox(); };
+lightboxEl.querySelector(".lb-prev").onclick = function (e) { e.stopPropagation(); showSlide(carousel.i - 1); };
+lightboxEl.querySelector(".lb-next").onclick = function (e) { e.stopPropagation(); showSlide(carousel.i + 1); };
+lightboxEl.onclick = function () { closeLightbox(); };
+lightboxEl.querySelector("img").onclick = function (e) { e.stopPropagation(); };
 ["mousedown", "touchstart", "wheel", "dragstart"].forEach(function (ev) {
   map.on(ev, function (e) {
     if (fitting && e.originalEvent) { fitting = false; map.stop(); }

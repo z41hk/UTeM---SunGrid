@@ -42,7 +42,20 @@ The campus outline is OSM way 587894193 (Kampus Induk). That polygon is hardcode
 ## Project structure
 
 - `index.html` — page, CSS, map style, campus data, labels, modal
+- `images/` — resized solar-panel photos, one folder per faculty
 - `README.md` — this file
+
+## Solar panel images
+
+Photos live in `images/<faculty-code>/` (for example `images/ftke/` and `images/fkekk/`). Originals are not stored in the repo.
+
+To add another faculty:
+
+1. Resize so the longest side is at most 1600 px, JPEG quality around 82, no spaces in filenames.
+2. Put the files in `images/<code>/`.
+3. Add an `images` array on that faculty’s `BUILDINGS` entry: `{ src, caption, ref }`. Use `ref: true` for a reference diagram.
+
+The modal carousel reads that array. Faculties without photos still show “Gambar akan ditambah”.
 
 ## Deployment
 
